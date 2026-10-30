@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin Panel</title>
+<link rel="icon" href="img/icon-64.png">
+<link rel="apple-touch-icon" href="img/icon-192.png">
 <link rel="stylesheet" href="style.css">
 <style>
   .layout{display:flex;min-height:calc(100vh - 56px)}
@@ -39,6 +41,40 @@
   .panel h3{font-size:17px;margin-bottom:14px}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .catrow td{background:#fcf6f0;font-weight:700;color:var(--brand)}
+  .photo-pick{display:flex;gap:14px;align-items:center}
+  .photo-box{width:96px;height:96px;border-radius:12px;background:#f1e9e1;flex:none;overflow:hidden;display:grid;place-items:center;font-size:34px;border:1px solid var(--line)}
+  .photo-box img{width:100%;height:100%;object-fit:cover}
+  .photo-btns{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .photo-btns label.btn{cursor:pointer}
+  .salesgrid{display:grid;grid-template-columns:3fr 2fr;gap:20px;align-items:start}
+  @media (max-width:900px){.salesgrid{grid-template-columns:1fr}}
+  .barrow{display:flex;align-items:center;gap:10px}
+  .bar{height:12px;border-radius:6px;background:var(--brand);min-width:2px;opacity:.85;flex:none}
+  .side .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:8px;border-radius:99px;background:var(--brand);color:#fff;font-size:12px;text-align:center;line-height:20px}
+  .otabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .otabs button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:8px 16px;font-weight:600}
+  .otabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .otabs .count{display:inline-block;min-width:22px;padding:0 6px;margin-left:6px;border-radius:99px;background:var(--brand);color:#fff;font-size:12px;text-align:center}
+  .ogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .ocard{padding:16px;display:flex;flex-direction:column;gap:10px;border-left:5px solid var(--line)}
+  .ocard.new{border-left-color:var(--brand)} .ocard.processing,.ocard.ready{border-left-color:var(--amber)} .ocard.delivered{border-left-color:var(--green)} .ocard.cancelled{opacity:.6}
+  .ohead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .oname{font-size:18px}
+  .otype{font-weight:600}
+  .ocontact{display:flex;gap:8px;flex-wrap:wrap}
+  .ocontact a{text-decoration:none}
+  .ocard ul{margin:0;padding:0;list-style:none}
+  .ocard li{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--line)}
+  .ocard .note{background:var(--amber-soft);border-radius:8px;padding:8px 10px;font-size:14px}
+  .ototal{display:flex;justify-content:space-between;font-weight:800}
+  .opay{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#f6f1ec;border-radius:10px;padding:9px 12px;font-size:14px}
+  .opay.ok{background:var(--green-soft)} .opay.warn2{background:var(--amber-soft)}
+  .oacts{display:flex;gap:8px;flex-wrap:wrap}
+  .oacts .btn:first-child{flex:1}
+  .tog{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line);margin:0;color:var(--ink);font-size:15px}
+  .tog small{display:block;font-weight:400}
+  .tog b{font-weight:600}
+  .content .empty{text-align:center;color:var(--muted);padding:50px 20px;grid-column:1/-1}
   .warn{background:var(--amber-soft);border:1px solid #f1d9a6;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:14px}
   .linkbtn{background:none;border:0;color:var(--brand);font-weight:600;padding:0;margin-top:14px;display:block;text-align:center;width:100%}
   @media (max-width:760px){
@@ -59,6 +95,7 @@
 <body>
 <div id="app"></div>
 <script src="config.js"></script>
+<script>window.CK_SITE = 'admin';</script>
 <script src="firebase-app-compat.js"></script>
 <script src="firebase-auth-compat.js"></script>
 <script src="firebase-database-compat.js"></script>
@@ -66,7 +103,7 @@
 <script src="common.js"></script>
 <script>
 let view = 'dashboard', settings = {}, me = null, ordersSub = null;
-const VIEWS = [['dashboard', '📊 Dashboard'], ['menu', '🍜 Menu & prices'], ['staff', '👥 Waiter accounts'], ['tables', '🔳 Tables & QR codes'], ['settings', '⚙️ Settings']];
+const VIEWS = [['dashboard', 'Dashboard', 'chart'], ['online', 'Online orders', 'bag'], ['sales', 'Sales report', 'wallet'], ['menu', 'Menu & prices', 'book'], ['staff', 'Waiter accounts', 'users'], ['tables', 'Tables & QR codes', 'qr'], ['shop', 'Online shop', 'store'], ['settings', 'Settings', 'settings']];
 
 (async () => {
   if (!CONFIGURED) return showSetupNeeded($('#app'));
@@ -104,7 +141,7 @@ async function seedIfEmpty() {
 function firstTimeSetup() {
   $('#app').innerHTML = `
   <div class="login-wrap"><form class="card login" autocomplete="off">
-    <div class="logo">👋</div>
+    <div class="logo">${ic('userPlus', 34)}</div>
     <h1>Welcome! Create your admin account</h1>
     <p class="muted">This is shown only once. The first account made here becomes the owner/admin.</p>
     <div class="field"><label>Your name</label><input type="text" name="name" required maxlength="60" placeholder="e.g. Kushal"></div>
@@ -130,7 +167,7 @@ function firstTimeSetup() {
       });
       await seedIfEmpty();
       settings = await loadSettings();
-      toast('🎉 Admin account created');
+      toast('Admin account created');
       start(await currentStaff(['admin']));
     } catch (ex) { err.textContent = friendly(ex); btn.disabled = false; }
   };
@@ -140,24 +177,207 @@ function start(staff) {
   me = staff;
   CURRENCY = settings.currency;
   $('#app').innerHTML = `
-    <div class="topbar"><span class="name" id="brand">☁️ ${esc(settings.cafeName)} · Admin</span><span class="spacer"></span>
-      <span class="small" style="opacity:.8">👤 ${esc(me.name)}</span>
+    <div class="topbar"><span class="name"><img class="brandlogo" src="img/icon-64.png" alt="" width="30" height="30"> <span id="brand">${esc(settings.cafeName)} · Admin</span></span><span class="spacer"></span>
+      <span class="small" style="opacity:.8">${ic('user', 15)} ${esc(me.name)}</span>
+      <button class="btn ghost sm" id="sound">${ic('bell', 15)}Sound</button>
       <button class="btn ghost sm" onclick="logout()">Log out</button></div>
     <div class="layout"><nav class="side" id="side"></nav><div class="content" id="content"></div></div>`;
   $('#side').onclick = e => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; show(); } };
+  $('#sound').onclick = async () => {
+    unlockAudio(); ding();
+    if ('Notification' in window) { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Sound and pop-ups are on for new online orders' : 'Sound is on for new online orders'); }
+  };
   show();
+  listenOnline();
+}
+
+// ---------- Online orders (live, with sound) ----------
+let onlineOrders = [], onlineSeen = null, onlineTab = 'new';
+const onlineNew = () => onlineOrders.filter(o => o.status === 'new').length;
+function listenOnline() {
+  db.ref('orders').orderByChild('createdAt').startAt(Date.now() - 3 * 86400e3).on('value', snap => {
+    const list = [];
+    snap.forEach(c => { const v = c.val(); if (validOrder(v) && v.source === 'online') list.push(normOrder({ id: c.key, ...v })); });
+    if (onlineSeen) for (const o of list) if (!onlineSeen.has(o.id) && o.status === 'new') {
+      ding(); toast(`New online order from ${o.customer?.name || 'a customer'}: ${money(o.total)}`, 'alert', 8000);
+      if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification('New online order', { body: `${o.customer?.name || ''}: ${money(o.total)}` }); } catch {} }
+    }
+    onlineSeen = new Set(list.map(o => o.id));
+    onlineOrders = list.sort((a, b) => b.createdAt - a.createdAt);
+    const b = $('#onlineBadge'); if (b) { b.textContent = onlineNew(); b.hidden = !onlineNew(); }
+    document.title = (onlineNew() ? `(${onlineNew()}) ` : '') + 'Admin Panel';
+    if (view === 'online') drawOnline();
+  }, () => {});
+}
+const waNumber = p => { const d = waStart(p); return d.length === 10 && d.startsWith('9') ? '977' + d : d; };
+async function onlinePage() { drawOnline(); }
+function drawOnline() {
+  const groups = { new: ['new'], active: ['processing', 'ready'], done: ['delivered', 'cancelled'] };
+  const list = onlineOrders.filter(o => groups[onlineTab].includes(o.status));
+  if (onlineTab !== 'done') list.reverse(); // oldest first while working
+  const n = k => onlineOrders.filter(o => groups[k].includes(o.status)).length;
+  const stLabel = o => ({ new: 'new', processing: 'preparing', ready: o.orderType === 'pickup' ? 'ready' : 'on the way', delivered: o.orderType === 'pickup' ? 'picked up' : 'delivered', cancelled: 'cancelled' }[o.status]);
+  const pill = o => ({ new: 'new', processing: 'processing', ready: 'processing', delivered: 'delivered', cancelled: 'cancelled' }[o.status]);
+  C().innerHTML = `
+    <div class="head"><div><h2>Online orders</h2><div class="muted">From your online shop website. New orders play a sound${'Notification' in window && Notification.permission !== 'granted' ? ' (tap <b>Sound</b> at the top once)' : ''}.</div></div></div>
+    ${!onlineOrders.length && !settings._shopChecked ? '' : ''}
+    <div class="otabs">${[['new', 'New'], ['active', 'In progress'], ['done', 'Done (3 days)']].map(([k, l]) => `<button data-t="${k}" class="${onlineTab === k ? 'on' : ''}">${l}${n(k) && k !== 'done' ? `<span class="count">${n(k)}</span>` : ''}</button>`).join('')}</div>
+    <div class="ogrid">${list.map(o => {
+      const c = o.customer || {}, pay = o.payment || {};
+      const tel = String(c.phone || '').replace(/[^0-9+]/g, '');
+      const wa = `https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(`Hi ${c.name || ''}, this is ${settings.cafeName} about your order ${o.code}. `)}`;
+      return `<div class="card ocard ${esc(o.status)}" data-id="${esc(o.id)}">
+        <div class="ohead"><div><b class="oname">${esc(c.name || 'Customer')}</b><div class="small muted">Order ${esc(o.code)}, ${timeAgo(o.createdAt)}</div></div><span class="pill ${pill(o)}">${esc(stLabel(o))}</span></div>
+        <div class="otype">${o.orderType === 'pickup' ? `${ic('store', 16)} Pickup at the cafe${c.address ? `<div class="small muted" style="font-weight:400">Address: ${esc(c.address)}</div>` : ''}` : `${ic('truck', 16)} Delivery: ${esc(c.address || '')}`}</div>
+        <div class="ocontact"><a class="btn ghost sm" href="tel:${esc(tel)}">${ic('call', 14)}${esc(c.phone || '')}</a><a class="btn ghost sm" href="${esc(wa)}" target="_blank" rel="noopener">${ic('message', 14)}WhatsApp</a></div>
+        <ul>${o.items.map(l => `<li><span><b>${l.qty}x</b> ${esc(l.name)}</span><span class="muted">${money(l.price * l.qty)}</span></li>`).join('')}
+          ${o.orderType === 'delivery' ? `<li><span class="muted">Delivery</span><span class="muted">${o.deliveryFee ? money(o.deliveryFee) : 'Free'}</span></li>` : ''}</ul>
+        ${o.note ? `<div class="note">${ic('note', 15)} ${esc(o.note)}</div>` : ''}
+        <div class="ototal"><span>Total</span><span>${money(o.total)}</span></div>
+        <div class="opay ${pay.method === 'online' ? (pay.verified ? 'ok' : 'warn2') : ''}">
+          ${pay.method === 'online'
+            ? `${ic('phone', 15)} Paid online${pay.ref ? `, transaction ID <b>${esc(pay.ref)}</b>` : ''}. ${pay.verified ? '<b>Payment received</b>' : `Check your ${esc((settings._wallet) || 'wallet')} app.`}`
+            : `${ic('cash', 15)} ${o.orderType === 'pickup' ? 'Pay at pickup' : 'Cash on delivery'}`}
+          ${pay.method === 'online' && !pay.verified ? `<button class="btn green sm" data-pay="1">${ic('check', 14)}Payment received</button>` : ''}
+        </div>
+        <div class="oacts">
+          ${o.status === 'new' ? `<button class="btn amber" data-s="processing">${ic('flame', 16)}Accept and start preparing</button><button class="btn danger sm" data-s="cancelled">Cancel</button>` : ''}
+          ${o.status === 'processing' ? `<button class="btn" data-s="ready">${o.orderType === 'pickup' ? ic('check', 16) + 'Ready for pickup' : ic('truck', 16) + 'Out for delivery'}</button><button class="btn ghost sm" data-s="new">Undo</button>` : ''}
+          ${o.status === 'ready' ? `<button class="btn green" data-s="delivered">${ic('check', 16)}${o.orderType === 'pickup' ? 'Picked up' : 'Delivered'}</button><button class="btn ghost sm" data-s="processing">Undo</button>` : ''}
+          ${o.status === 'delivered' || o.status === 'cancelled' ? `<button class="btn ghost sm" data-s="processing">Reopen</button>` : ''}
+        </div>
+      </div>`;
+    }).join('') || `<div class="empty">${onlineTab === 'new' ? `<div style="margin-bottom:8px">${ic('bag', 34)}</div>No new online orders. They'll appear here with a sound.` : 'Nothing here.'}</div>`}</div>`;
+  C().querySelector('.otabs').onclick = e => { const b = e.target.closest('button'); if (b) { onlineTab = b.dataset.t; drawOnline(); } };
+  C().querySelector('.ogrid').onclick = async e => {
+    const b = e.target.closest('button[data-s],button[data-pay]'); if (!b) return;
+    const id = b.closest('[data-id]').dataset.id;
+    if (b.dataset.s === 'cancelled' && !confirm('Cancel this order? Let the customer know on WhatsApp or by phone.')) return;
+    b.disabled = true;
+    try {
+      if (b.dataset.pay) await db.ref('orders/' + id).update({ 'payment/verified': true, handledBy: me.name, updatedAt: TS() });
+      else await db.ref('orders/' + id).update({ status: b.dataset.s, handledBy: me.name, updatedAt: TS() });
+    } catch (err) { toast(friendly(err), 'alert'); b.disabled = false; }
+  };
+}
+
+// ---------- Online shop settings ----------
+async function compressQr(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not read that image. Please use a JPG or PNG.')); i.src = url; });
+    const scale = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+    let q = 0.92, data = c.toDataURL('image/jpeg', q);
+    while (data.length > 380000 && q > 0.5) { q -= 0.1; data = c.toDataURL('image/jpeg', q); }
+    return data;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function shopPage() {
+  const sh = (await db.ref('online').once('value')).val() || {};
+  const qrData = sh.payQr ? (await db.ref('payqr').once('value')).val() : null;
+  const tog = (name, label, on, hint = '') => `<label class="tog"><span><b>${label}</b>${hint ? `<small class="muted">${hint}</small>` : ''}</span><span class="switch"><input type="checkbox" name="${name}" ${on ? 'checked' : ''}><span></span></span></label>`;
+  C().innerHTML = `
+    <div class="head"><div><h2>Online shop</h2><div class="muted">Settings for your online ordering website (the <b>cloud-kitchen-online</b> site).</div></div></div>
+    <form class="card panel" id="shopf" style="max-width:640px">
+      <h3>Ordering</h3>
+      ${tog('enabled', 'Accept online orders', sh.enabled, 'Turn off to pause ordering. Customers can still see the menu.')}
+      ${tog('allowDelivery', 'Delivery', sh.allowDelivery !== false)}
+      <div class="field" style="max-width:220px;margin-left:2px"><label>Delivery fee (${esc(CURRENCY)})</label><input type="number" name="deliveryFee" min="0" step="any" value="${Number(sh.deliveryFee) || 0}"></div>
+      ${tog('allowPickup', 'Pickup at the cafe', sh.allowPickup !== false)}
+      <h3 style="margin-top:22px">Payment</h3>
+      ${tog('cod', 'Cash on delivery / pay at pickup', sh.cod !== false)}
+      ${tog('payOnline', 'Pay online', !!sh.payOnline, 'Customers see your payment QR and wallet details at checkout.')}
+      <div class="row2">
+        <div class="field"><label>Wallet or bank</label><input type="text" name="walletName" maxlength="40" value="${esc(sh.walletName || '')}" placeholder="e.g. eSewa, Khalti, Fonepay"></div>
+        <div class="field"><label>Wallet / account number</label><input type="text" name="walletNumber" maxlength="40" value="${esc(sh.walletNumber || '')}" placeholder="e.g. 98XXXXXXXX"></div>
+      </div>
+      <div class="field"><label>Account name</label><input type="text" name="accountName" maxlength="60" value="${esc(sh.accountName || '')}" placeholder="Name shown in the payment app"></div>
+      <div class="field"><label>Payment QR code</label>
+        <div class="photo-pick">
+          <div class="photo-box" id="qrbox" style="width:120px;height:120px;background:#fff">${qrData ? `<img src="${qrData}" alt="" style="object-fit:contain">` : ic('qr', 40)}</div>
+          <div class="photo-btns">
+            <label class="btn ghost sm" style="margin:0;color:var(--ink);font-weight:600">${ic('camera', 15)}Upload QR image<input type="file" name="qrfile" accept="image/*" hidden></label>
+            <button type="button" class="btn danger sm" id="qrremove" ${qrData ? '' : 'hidden'}>Remove QR</button>
+            <div class="small muted">A screenshot of your eSewa / Khalti / bank QR works.</div>
+          </div>
+        </div></div>
+      <h3 style="margin-top:22px">Automatic WhatsApp alerts</h3>
+      <p class="small muted" style="margin:-6px 0 12px">Every online order is also sent to your WhatsApp automatically, using the free CallMeBot service. Set it up once:</p>
+      <ol class="small" style="margin:0 0 14px;padding-left:20px;line-height:1.7">
+        <li>Open <b>callmebot.com</b> → "Free API WhatsApp" and save the bot's phone number shown there in your phone's contacts.</li>
+        <li>From the WhatsApp number below, send the bot: <b>I allow callmebot to send me messages</b></li>
+        <li>The bot replies with your <b>API key</b>. Paste it here, save, then tap <b>Send test message</b>.</li>
+      </ol>
+      <div class="row2">
+        <div class="field"><label>Your WhatsApp number</label><input type="text" name="whatsapp" maxlength="20" value="${esc(sh.whatsapp || '')}" placeholder="e.g. 9779812345678"><div class="small muted" style="margin-top:4px">With country code (Nepal: 977…)</div></div>
+        <div class="field"><label>CallMeBot API key</label><input type="text" name="alertKey" maxlength="40" value="${esc(sh.alertKey || '')}" placeholder="e.g. 1234567" autocomplete="off"></div>
+      </div>
+      <button type="button" class="btn ghost sm" id="watest" style="margin:-4px 0 6px">${ic('message', 14)}Send test message</button>
+      <div class="small muted" style="margin-bottom:6px">If the bot says it's full, try again in a few days. Orders always arrive here in the admin panel either way.</div>
+      <h3 style="margin-top:22px">Contact</h3>
+      <div class="row2">
+        <div class="field"><label>Phone shown on the website</label><input type="text" name="phone" maxlength="30" value="${esc(sh.phone || '')}" placeholder="e.g. 9812345678"></div>
+      </div>
+      <div class="field"><label>Cafe address</label><input type="text" name="address" maxlength="150" value="${esc(sh.address || '')}" placeholder="e.g. Jhamsikhel, Lalitpur"></div>
+      <div class="field"><label>Opening hours</label><input type="text" name="hours" maxlength="80" value="${esc(sh.hours || '')}" placeholder="e.g. Open daily 8am to 9pm"></div>
+      <h3 style="margin-top:22px">Website text</h3>
+      <div class="field"><label>Big headline</label><input type="text" name="headline" maxlength="90" value="${esc(sh.headline || '')}" placeholder="Hot momo and fresh chiya, brought to your door."></div>
+      <div class="field"><label>Short intro</label><textarea name="about" rows="2" maxlength="300" placeholder="One or two sentences about your cafe">${esc(sh.about || '')}</textarea></div>
+      <div class="error"></div>
+      <button class="btn" type="submit">Save online shop</button>
+    </form>`;
+  const f = $('#shopf');
+  let qrNew = null, qrRemove = false;
+  f.qrfile.onchange = async () => {
+    const file = f.qrfile.files[0]; if (!file) return;
+    try { qrNew = await compressQr(file); qrRemove = false; $('#qrbox').innerHTML = `<img src="${qrNew}" alt="" style="object-fit:contain">`; $('#qrremove').hidden = false; }
+    catch (err) { $('.error', f).textContent = err.message; }
+    f.qrfile.value = '';
+  };
+  $('#qrremove').onclick = () => { qrNew = null; qrRemove = true; $('#qrbox').innerHTML = ic('qr', 40); $('#qrremove').hidden = true; };
+  $('#watest').onclick = () => {
+    const num = waStart(f.whatsapp.value), key = f.alertKey.value.trim();
+    if (num.length < 10 || !key) return toast('Enter your WhatsApp number (with 977) and the API key first', 'alert');
+    const text = `Test from ${settings.cafeName}: online order alerts are working.`;
+    fetch(`https://api.callmebot.com/whatsapp.php?phone=%2B${num}&apikey=${encodeURIComponent(key)}&text=${encodeURIComponent(text)}`, { mode: 'no-cors' }).catch(() => {});
+    toast('Test sent. Check your WhatsApp in a few seconds. If nothing arrives, check the number and API key.', '', 7000);
+  };
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const err = $('.error', f), v = n => f[n].value.trim(), on = n => f[n].checked;
+    const row = {
+      enabled: on('enabled'), allowDelivery: on('allowDelivery'), allowPickup: on('allowPickup'), deliveryFee: Math.max(0, Number(f.deliveryFee.value) || 0),
+      cod: on('cod'), payOnline: on('payOnline'), walletName: v('walletName'), walletNumber: v('walletNumber'), accountName: v('accountName'),
+      whatsapp: waStart(v('whatsapp')), alertKey: v('alertKey'), phone: v('phone'), address: v('address'), hours: v('hours'), headline: v('headline'), about: v('about'),
+    };
+    const hasQr = qrNew || (sh.payQr && !qrRemove);
+    if (row.enabled && !row.allowDelivery && !row.allowPickup) return err.textContent = 'Turn on Delivery or Pickup (or both).';
+    if (row.enabled && !row.cod && !row.payOnline) return err.textContent = 'Turn on at least one payment option.';
+    if (row.payOnline && !row.walletNumber && !hasQr) return err.textContent = 'For online payment, add a wallet number or upload a payment QR.';
+    if (row.whatsapp && row.whatsapp.length < 10) return err.textContent = 'WhatsApp number looks too short. Include the country code, e.g. 9779812345678.';
+    if (row.alertKey && !row.whatsapp) return err.textContent = 'Add your WhatsApp number for the alerts.';
+    err.textContent = '';
+    const up = { online: { ...row, ...(hasQr ? { payQr: qrNew ? Date.now() : sh.payQr } : {}) } };
+    if (qrNew) up.payqr = qrNew;
+    if (qrRemove && !qrNew) up.payqr = null;
+    try { await db.ref().update(up); toast('Online shop saved'); shopPage(); }
+    catch (ex) { err.textContent = friendly(ex); }
+  };
 }
 function show() {
   if (ordersSub) { ordersSub.off(); ordersSub = null; }
-  $('#side').innerHTML = VIEWS.map(([k, l]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('');
-  ({ dashboard, menu, staff: staffPage, tables, settings: settingsPage }[view])().catch(err => toast(friendly(err), 'alert'));
+  $('#side').innerHTML = VIEWS.map(([k, l, i]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${ic(i, 17)}${l}${k === 'online' ? `<span class="count" id="onlineBadge"${onlineNew() ? '' : ' hidden'}>${onlineNew()}</span>` : ''}</button>`).join('');
+  ({ dashboard, online: onlinePage, sales, menu, staff: staffPage, tables, shop: shopPage, settings: settingsPage }[view])().catch(err => toast(friendly(err), 'alert'));
 }
 const C = () => $('#content');
 
 // ---------- Dashboard (live) ----------
 async function dashboard() {
   C().innerHTML = `<div class="muted">Loading…</div>`;
-  ordersSub = db.ref('orders').orderByChild('createdAt').limitToLast(500);
+  const since = Math.min(monthStart(new Date()), Date.now() - 7 * 86400e3);
+  ordersSub = db.ref('orders').orderByChild('createdAt').startAt(since);
   ordersSub.on('value', snap => {
     if (view !== 'dashboard') return;
     const all = [];
@@ -170,18 +390,23 @@ function drawDashboard(all) {
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const today = all.filter(o => o.createdAt >= start.getTime() && o.status !== 'cancelled');
   const sales = today.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+  const ms = monthStart(new Date());
+  const monthSales = all.filter(o => o.createdAt >= ms && o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+  const monthOrders = all.filter(o => o.createdAt >= ms && o.status !== 'cancelled').length;
   const pending = all.filter(o => o.status === 'new' || o.status === 'processing').length;
   const top = {};
   today.forEach(o => o.items.forEach(l => top[l.name] = (top[l.name] || 0) + l.qty));
   const topList = Object.entries(top).sort((a, b) => b[1] - a[1]);
   const offline = today.filter(o => o.source === 'staff').length;
-  const warn = !settings.customerUrl ? `<div class="warn">⚠️ Set your <b>customer menu website address</b> in <b>Settings</b> so the table QR codes work.</div>` : '';
+  const onlineCount = today.filter(o => o.source === 'online').length;
+  const warn = !settings.customerUrl ? `<div class="warn">${ic('alert', 16)} Set your <b>customer menu website address</b> in <b>Settings</b> so the table QR codes work.</div>` : '';
   C().innerHTML = `
     <div class="head"><div><h2>Today</h2><div class="muted">${new Date().toDateString()}</div></div></div>
     ${warn}
     <div class="stats">
-      <div class="card stat"><div class="muted small">Sales (delivered)</div><div class="v">${money(sales)}</div></div>
-      <div class="card stat"><div class="muted small">Orders today</div><div class="v">${today.length}</div><div class="small muted">${today.length - offline} QR · ${offline} offline</div></div>
+      <div class="card stat"><div class="muted small">Sales today</div><div class="v">${money(sales)}</div></div>
+      <div class="card stat"><div class="muted small">Sales this month</div><div class="v">${money(monthSales)}</div><div class="small muted">${monthOrders} orders · <a href="#" onclick="view='sales';show();return false" style="color:var(--brand)">full report</a></div></div>
+      <div class="card stat"><div class="muted small">Orders today</div><div class="v">${today.length}</div><div class="small muted">${today.length - offline - onlineCount} QR, ${offline} offline, ${onlineCount} online</div></div>
       <div class="card stat"><div class="muted small">Pending now</div><div class="v" style="color:var(--brand)">${pending}</div></div>
       <div class="card stat"><div class="muted small">Top item</div><div class="v" style="font-size:18px">${topList[0] ? esc(topList[0][0]) : '—'}</div></div>
     </div>
@@ -189,13 +414,104 @@ function drawDashboard(all) {
     <div class="tablewrap"><table>
       <tr><th>Order</th><th>Table</th><th>Items</th><th>Total</th><th>Status</th><th>When</th><th>Staff</th></tr>
       ${all.slice(0, 50).map(o => `<tr>
-        <td>${esc(o.code)}</td><td><b>${esc(place(o.table))}</b><div class="small muted">${o.source === 'staff' ? '✍️ Offline' : '📱 QR'}</div></td>
-        <td class="small">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}${o.note ? `<div class="muted">📝 ${esc(o.note)}</div>` : ''}</td>
+        <td>${esc(o.code)}</td><td><b>${esc(place(o.table))}</b><div class="small muted">${o.source === 'staff' ? ic('pencil', 12) + ' Offline' : o.source === 'online' ? ic('bag', 12) + ' Online' : ic('phone', 12) + ' QR'}</div></td>
+        <td class="small">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}${o.note ? `<div class="muted">${ic('note', 13)} ${esc(o.note)}</div>` : ''}</td>
         <td>${money(o.total)}</td><td><span class="pill ${esc(o.status)}">${esc(o.status)}</span></td>
         <td class="small muted">${timeAgo(o.createdAt)}</td>
         <td class="small">${o.createdByName ? 'Added by ' + esc(o.createdByName) : ''}${o.handledBy && o.handledBy !== o.createdByName ? (o.createdByName ? '<br>' : '') + esc(o.handledBy) : ''}</td></tr>`).join('')
         || `<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">No orders yet</td></tr>`}
     </table></div>`;
+}
+
+// ---------- Sales report ----------
+const monthStart = d => new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+const pad2 = n => String(n).padStart(2, '0');
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+let salesMonth = null, salesRows = [];
+
+async function sales() {
+  const now = new Date();
+  salesMonth = salesMonth || `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+  C().innerHTML = `
+    <div class="head"><div><h2>Sales report</h2><div class="muted">Sales count orders marked <b>delivered</b>. Times are this device's local time.</div></div>
+      <span class="spacer"></span>
+      <input type="month" id="mon" value="${salesMonth}" max="${now.getFullYear()}-${pad2(now.getMonth() + 1)}" style="max-width:170px">
+      <button class="btn ghost" id="csv">${ic('download', 16)}Download (Excel)</button></div>
+    <div id="rep"><div class="muted">Loading…</div></div>`;
+  $('#mon').onchange = e => { if (e.target.value) { salesMonth = e.target.value; drawSales(); } };
+  $('#csv').onclick = downloadCsv;
+  await drawSales();
+}
+
+async function drawSales() {
+  const [y, m] = salesMonth.split('-').map(Number);
+  const start = new Date(y, m - 1, 1).getTime(), end = new Date(y, m, 1).getTime() - 1;
+  const snap = await db.ref('orders').orderByChild('createdAt').startAt(start).endAt(end).once('value');
+  const all = [];
+  snap.forEach(c => { const v = c.val(); if (validOrder(v)) all.push(normOrder({ id: c.key, ...v })); });
+  const done = all.filter(o => o.status === 'delivered');
+  const total = done.reduce((s, o) => s + o.total, 0);
+  const cancelled = all.filter(o => o.status === 'cancelled').length;
+  const open = all.filter(o => o.status === 'new' || o.status === 'processing').length;
+  const qrSales = done.filter(o => o.source === 'qr').reduce((s, o) => s + o.total, 0);
+  const onlineSales = done.filter(o => o.source === 'online').reduce((s, o) => s + o.total, 0);
+
+  // day by day
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const now = new Date(), isThisMonth = now.getFullYear() === y && now.getMonth() === m - 1;
+  const lastDay = isThisMonth ? now.getDate() : daysInMonth;
+  const byDay = {};
+  for (let d = 1; d <= lastDay; d++) byDay[`${y}-${pad2(m)}-${pad2(d)}`] = { sales: 0, orders: 0 };
+  done.forEach(o => { const k = dayKey(o.createdAt); if (byDay[k]) { byDay[k].sales += o.total; byDay[k].orders++; } });
+  salesRows = Object.entries(byDay).map(([day, v]) => ({ day, ...v }));
+  const best = salesRows.reduce((b, r) => (r.sales > (b ? b.sales : 0) ? r : b), null);
+  const maxSale = Math.max(1, ...salesRows.map(r => r.sales));
+  const todayRow = isThisMonth ? byDay[dayKey(Date.now())] : null;
+
+  // best sellers
+  const items = {};
+  done.forEach(o => o.items.forEach(l => { const it = items[l.name] || (items[l.name] = { qty: 0, sales: 0 }); it.qty += l.qty; it.sales += l.qty * l.price; }));
+  const topItems = Object.entries(items).sort((a, b) => b[1].sales - a[1].sales).slice(0, 10);
+  const fmtDay = k => new Date(k + 'T00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const monthName = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  $('#rep').innerHTML = `
+    <div class="stats">
+      ${todayRow ? `<div class="card stat"><div class="muted small">Today</div><div class="v">${money(todayRow.sales)}</div><div class="small muted">${todayRow.orders} orders delivered</div></div>` : ''}
+      <div class="card stat"><div class="muted small">${esc(monthName)}</div><div class="v">${money(total)}</div><div class="small muted">${done.length} orders delivered</div></div>
+      <div class="card stat"><div class="muted small">Average per day</div><div class="v">${money(Math.round(total / Math.max(1, lastDay)))}</div><div class="small muted">over ${lastDay} day${lastDay > 1 ? 's' : ''}</div></div>
+      <div class="card stat"><div class="muted small">Best day</div><div class="v" style="font-size:20px">${best ? esc(fmtDay(best.day)) : '—'}</div><div class="small muted">${best ? money(best.sales) : 'no sales yet'}</div></div>
+    </div>
+    <div class="small muted" style="margin:-10px 0 20px">QR orders: <b>${money(qrSales)}</b> · Offline orders: <b>${money(total - qrSales - onlineSales)}</b> · Online orders: <b>${money(onlineSales)}</b>${open ? ` · ${open} order${open > 1 ? 's' : ''} still open (not counted yet)` : ''}${cancelled ? ` · ${cancelled} cancelled` : ''}</div>
+    <div class="salesgrid">
+      <div>
+        <h3 style="margin:0 0 10px">Day by day</h3>
+        <div class="tablewrap"><table>
+          <tr><th>Day</th><th>Orders</th><th style="width:45%">Sales</th></tr>
+          ${salesRows.slice().reverse().map(r => `<tr${r === best ? ' style="background:#fdf6ee"' : ''}>
+            <td>${esc(fmtDay(r.day))}</td><td>${r.orders}</td>
+            <td><div class="barrow">${r.sales ? `<div class="bar" style="width:${(r.sales / maxSale * 60).toFixed(1)}%"></div>` : ''}<b${r.sales ? '' : ' class="muted"'}>${money(r.sales)}</b></div></td></tr>`).join('')}
+          <tr style="font-weight:800;background:#fcf9f6"><td>Total</td><td>${done.length}</td><td>${money(total)}</td></tr>
+        </table></div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 10px">Best sellers</h3>
+        <div class="tablewrap"><table>
+          <tr><th>Item</th><th>Qty</th><th>Sales</th></tr>
+          ${topItems.map(([n, v]) => `<tr><td>${esc(n)}</td><td>${v.qty}</td><td>${money(v.sales)}</td></tr>`).join('') || `<tr><td colspan="3" class="muted" style="text-align:center;padding:20px">No sales yet</td></tr>`}
+        </table></div>
+      </div>
+    </div>`;
+}
+
+function downloadCsv() {
+  const lines = [['Date', 'Orders delivered', 'Sales (' + CURRENCY + ')'], ...salesRows.map(r => [r.day, r.orders, r.sales]),
+    ['Total', salesRows.reduce((s, r) => s + r.orders, 0), salesRows.reduce((s, r) => s + r.sales, 0)]];
+  const csv = lines.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv' }));
+  a.download = `sales-${salesMonth}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 // ---------- Menu ----------
@@ -206,19 +522,20 @@ async function menu() {
   C().innerHTML = `
     <div class="head"><div><h2>Menu & prices</h2><div class="muted">Changes show on customers' phones right away.</div></div>
       <span class="spacer"></span>
-      <input type="search" id="msearch" placeholder="🔍 Search food…" style="max-width:220px" autocomplete="off">
+      <input type="search" id="msearch" placeholder="Search food…" style="max-width:220px" autocomplete="off">
       <button class="btn" id="add">+ Add food item</button></div>
     <div class="tablewrap"><table>
       <tr><th></th><th>Item</th><th>Price</th><th>Available</th><th></th></tr>
       ${cats.map(c => `<tr class="catrow" data-cat="${esc(c)}"><td colspan="5">${esc(c)}</td></tr>` + items.filter(i => i.category === c).map(i => `
         <tr data-id="${esc(i.id)}" data-cat="${esc(c)}" data-s="${esc([i.name, i.category, i.description].join(' '))}">
-          <td style="width:52px">${i.image ? `<img class="thumb" src="${esc(i.image)}" onerror="this.style.visibility='hidden'">` : ''}</td>
+          <td style="width:52px">${photoImg(i, 'thumb')}</td>
           <td><b>${esc(i.name)}</b>${i.description ? `<div class="small muted">${esc(i.description)}</div>` : ''}</td>
           <td><b>${money(i.price)}</b></td>
           <td><label class="switch"><input type="checkbox" data-a="toggle" ${i.available ? 'checked' : ''}><span></span></label></td>
           <td style="white-space:nowrap;text-align:right"><button class="btn ghost sm" data-a="edit">Edit</button><button class="btn danger sm" data-a="del">Delete</button></td>
         </tr>`).join('')).join('') || `<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">No items yet. Add your first food item.</td></tr>`}
     </table></div>`;
+  fillPhotos(C());
   $('#add').onclick = () => itemForm(null, cats);
   $('#msearch').oninput = e => {
     const qv = e.target.value.trim(), vis = new Set();
@@ -230,7 +547,7 @@ async function menu() {
     const id = el.closest('[data-id]').dataset.id, it = items.find(i => i.id === id);
     if (el.dataset.a === 'edit') itemForm(it, cats);
     if (el.dataset.a === 'del' && confirm(`Delete "${it.name}"?`)) {
-      try { await db.ref('menu/' + id).remove(); toast('Deleted'); menu(); } catch (err) { toast(friendly(err), 'alert'); }
+      try { await db.ref().update({ ['menu/' + id]: null, ['photos/' + id]: null }); toast('Deleted'); menu(); } catch (err) { toast(friendly(err), 'alert'); }
     }
   };
   C().onchange = async e => {
@@ -252,21 +569,52 @@ function itemForm(it, cats) {
           <datalist id="catlist">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
       </div>
       <div class="field"><label>Description</label><input type="text" name="description" maxlength="200" value="${esc(it?.description || '')}" placeholder="Short description (optional)"></div>
-      <div class="field"><label>Photo link (optional)</label><input type="url" name="image" maxlength="500" value="${esc(it?.image || '')}" placeholder="https://…/photo.jpg"></div>
+      <div class="field"><label>Photo (optional)</label>
+        <div class="photo-pick">
+          <div class="photo-box" id="pbox">${it && (it.photo || it.image) ? photoImg(it) : ic('image', 34)}</div>
+          <div class="photo-btns">
+            <label class="btn ghost sm" style="margin:0;color:var(--ink);font-weight:600">${ic('camera', 15)}Choose photo<input type="file" name="file" accept="image/*" hidden></label>
+            <button type="button" class="btn danger sm" id="premove" ${it && (it.photo || it.image) ? '' : 'hidden'}>Remove photo</button>
+            <div class="small muted">Square photos look best. It's made smaller automatically.</div>
+          </div>
+        </div></div>
       <div class="error"></div>
       <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn">${it ? 'Save changes' : 'Add item'}</button></div>
     </form>`, (m, close) => {
     const f = $('form', m);
     $('[data-close]', m).onclick = close;
+    fillPhotos(m);
+    let newPhoto = null, removePhoto = false; // newPhoto: compressed JPEG, or null = unchanged
+    f.file.onchange = async () => {
+      const file = f.file.files[0]; if (!file) return;
+      $('.error', f).textContent = '';
+      try {
+        newPhoto = await compressPhoto(file); removePhoto = false;
+        $('#pbox', m).innerHTML = `<img src="${newPhoto}" alt="">`;
+        $('#premove', m).hidden = false;
+      } catch (err) { $('.error', f).textContent = err.message; }
+      f.file.value = '';
+    };
+    $('#premove', m).onclick = () => {
+      newPhoto = null; removePhoto = true;
+      $('#pbox', m).innerHTML = ic('image', 34); $('#premove', m).hidden = true;
+    };
     f.name.focus();
     f.onsubmit = async e => {
       e.preventDefault();
-      const row = { name: f.name.value.trim(), price: Number(f.price.value) || 0, category: f.category.value.trim() || 'Other', description: f.description.value.trim(), image: f.image.value.trim() };
+      const btn = $('button:not([type])', f); btn.disabled = true;
+      const id = it ? it.id : db.ref('menu').push().key;
+      const row = { name: f.name.value.trim(), price: Number(f.price.value) || 0, category: f.category.value.trim() || 'Other', description: f.description.value.trim() };
+      const up = {};
+      if (it) for (const k in row) up['menu/' + id + '/' + k] = row[k];
+      else up['menu/' + id] = { ...row, image: '', available: true, createdAt: TS() };
+      if (newPhoto) { up['photos/' + id] = newPhoto; up['menu/' + id + '/photo'] = Date.now(); if (it) up['menu/' + id + '/image'] = ''; }
+      if (removePhoto && it) { up['photos/' + id] = null; up['menu/' + id + '/photo'] = null; up['menu/' + id + '/image'] = ''; }
+      if (!it && newPhoto) { up['menu/' + id].photo = up['menu/' + id + '/photo']; delete up['menu/' + id + '/photo']; }
       try {
-        if (it) await db.ref('menu/' + it.id).update(row);
-        else await db.ref('menu').push({ ...row, available: true, createdAt: TS() });
+        await db.ref().update(up);
         close(); toast(it ? 'Saved' : 'Item added'); menu();
-      } catch (err) { $('.error', f).textContent = friendly(err); }
+      } catch (err) { $('.error', f).textContent = friendly(err); btn.disabled = false; }
     };
   });
 }
@@ -322,7 +670,7 @@ async function staffPage() {
           ['staff/' + uid]: { username, name: f.name.value.trim(), role: f.role.value, active: true, createdAt: TS() },
           ['usernames/' + username]: { uid, email },
         });
-        close(); toast(`✅ Login created: ${username}`); staffPage();
+        close(); toast(`Login created: ${username}`); staffPage();
       } catch (ex) { err.textContent = friendly(ex); btn.disabled = false; }
     };
   });
@@ -373,8 +721,8 @@ async function tables() {
   const ok = !!settings.customerUrl;
   C().innerHTML = `
     <div class="head"><div><h2>Tables & QR codes</h2><div class="muted">Print and stick one QR code on each table.</div></div>
-      <span class="spacer"></span><button class="btn ghost" id="edit">Edit tables</button>${ok ? `<button class="btn" onclick="print()">🖨️ Print all</button>` : ''}</div>
-    ${ok ? '' : `<div class="warn noprint">⚠️ First set your <b>customer menu website address</b> in <b>Settings</b>. The QR codes need it.</div>`}
+      <span class="spacer"></span><button class="btn ghost" id="edit">Edit tables</button>${ok ? `<button class="btn" onclick="print()">${ic('printer', 16)}Print all</button>` : ''}</div>
+    ${ok ? '' : `<div class="warn noprint">${ic('alert', 16)} First set your <b>customer menu website address</b> in <b>Settings</b>. The QR codes need it.</div>`}
     <div class="qrgrid">${list.map(t => {
       const url = menuLink(t.id);
       return `<div class="card qrcard">
@@ -384,7 +732,7 @@ async function tables() {
         <div class="small"><b>Scan to see the menu & order</b></div>
         <div class="u noprint">${esc(url)}</div>
         <div class="noprint" style="margin-top:8px"><a class="btn ghost sm" style="text-decoration:none" href="${qrDataUrl(url)}" download="qr-${esc(t.id)}.gif">Download</a>
-          <a class="btn ghost sm" style="text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener">Open ↗</a></div>` : `<div class="muted small" style="padding:30px 0">QR appears after you set the website address</div>`}
+          <a class="btn ghost sm" style="text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener">${ic('external', 13)}Open</a></div>` : `<div class="muted small" style="padding:30px 0">QR appears after you set the website address</div>`}
       </div>`;
     }).join('')}</div>`;
   $('#edit').onclick = () => openModal(`
@@ -447,7 +795,7 @@ async function settingsPage() {
     try {
       await db.ref('settings').set(row);
       Object.assign(settings, row); CURRENCY = settings.currency;
-      $('#brand').textContent = '☁️ ' + settings.cafeName + ' · Admin'; toast('Settings saved');
+      $('#brand').textContent = settings.cafeName + ' · Admin'; toast('Settings saved');
     } catch (err) { toast(friendly(err), 'alert'); }
   };
   $('#s2').onsubmit = async e => {
