@@ -1,4 +1,4 @@
-window.CK_VERSION = '20261030113511';
+window.CK_VERSION = '20261030120708';
 // Shared helpers for all Cloud Kitchen sites (Firebase Realtime Database version)
 const FB = window.CK_FIREBASE || {};
 const CONFIGURED = !!(FB.apiKey && FB.databaseURL && !/PASTE-/.test(FB.apiKey + FB.appId));

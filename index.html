@@ -79,6 +79,8 @@
   .alertbox{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:#fffdfb}
   .alertbox > b{display:flex;align-items:center;gap:8px;font-size:15px}
   .alertbox .code{font-family:ui-monospace,Menlo,monospace;background:var(--amber-soft);padding:1px 6px;border-radius:6px;user-select:all}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 16px}
+  .btnfield{display:flex;gap:8px;align-items:flex-end}
   .warn{background:var(--amber-soft);border:1px solid #f1d9a6;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:14px}
   .linkbtn{background:none;border:0;color:var(--brand);font-weight:600;padding:0;margin-top:14px;display:block;text-align:center;width:100%}
   @media (max-width:760px){
@@ -251,7 +253,7 @@ function drawOnline() {
   const stLabel = o => ({ new: 'new', processing: 'preparing', ready: o.orderType === 'pickup' ? 'ready' : 'on the way', delivered: o.orderType === 'pickup' ? 'picked up' : 'delivered', cancelled: 'cancelled' }[o.status]);
   const pill = o => ({ new: 'new', processing: 'processing', ready: 'processing', delivered: 'delivered', cancelled: 'cancelled' }[o.status]);
   C().innerHTML = `
-    <div class="head"><div><h2>Online orders</h2><div class="muted">From your online shop website. New orders play a sound${'Notification' in window && Notification.permission !== 'granted' ? ' (tap <b>Sound</b> at the top once)' : ''}.</div></div></div>
+    <div class="head"><h2>Online orders</h2></div>
     ${!onlineOrders.length && !settings._shopChecked ? '' : ''}
     <div class="otabs">${[['new', 'New'], ['active', 'In progress'], ['done', 'Done (3 days)']].map(([k, l]) => `<button data-t="${k}" class="${onlineTab === k ? 'on' : ''}">${l}${n(k) && k !== 'done' ? `<span class="count">${n(k)}</span>` : ''}</button>`).join('')}</div>
     <div class="ogrid">${list.map(o => {
@@ -311,17 +313,17 @@ async function shopPage() {
   const qrData = sh.payQr ? (await db.ref('payqr').once('value')).val() : null;
   const tog = (name, label, on, hint = '') => `<label class="tog"><span><b>${label}</b>${hint ? `<small class="muted">${hint}</small>` : ''}</span><span class="switch"><input type="checkbox" name="${name}" ${on ? 'checked' : ''}><span></span></span></label>`;
   C().innerHTML = `
-    <div class="head"><div><h2>Online shop</h2><div class="muted">Settings for your online ordering website (the <b>cloud-kitchen-online</b> site).</div></div></div>
+    <div class="head"><h2>Online shop</h2></div>
     <form class="card panel" id="shopf" style="max-width:640px">
       <h3>Ordering</h3>
-      ${tog('enabled', 'Accept online orders', sh.enabled, 'Turn off to pause ordering. Customers can still see the menu.')}
+      ${tog('enabled', 'Accept online orders', sh.enabled)}
       ${tog('allowDelivery', 'Delivery', sh.allowDelivery !== false)}
       <div class="field" style="max-width:220px;margin-left:2px"><label>Delivery fee (${esc(CURRENCY)})</label><input type="number" name="deliveryFee" min="0" step="any" value="${Number(sh.deliveryFee) || 0}"></div>
-      <div class="field" style="margin-left:2px"><label>Delivery areas (comma separated)</label><input type="text" name="areas" maxlength="300" value="${esc(sh.areas || 'Falful Chok, Daldaley, Danda')}" placeholder="e.g. Falful Chok, Daldaley, Danda"><div class="small muted" style="margin-top:4px">Customers choose one of these when ordering delivery.</div></div>
+      <div class="field" style="margin-left:2px"><label>Delivery areas</label><input type="text" name="areas" maxlength="300" value="${esc(sh.areas || 'Falful Chok, Daldaley, Danda')}" placeholder="e.g. Falful Chok, Daldaley, Danda"></div>
       ${tog('allowPickup', 'Pickup at the cafe', sh.allowPickup !== false)}
       <h3 style="margin-top:22px">Payment</h3>
       ${tog('cod', 'Cash on delivery / pay at pickup', sh.cod !== false)}
-      ${tog('payOnline', 'Pay online', !!sh.payOnline, 'Customers see your payment QR and wallet details at checkout.')}
+      ${tog('payOnline', 'Pay online', !!sh.payOnline)}
       <div class="row2">
         <div class="field"><label>Wallet or bank</label><input type="text" name="walletName" maxlength="40" value="${esc(sh.walletName || '')}" placeholder="e.g. eSewa, Khalti, Fonepay"></div>
         <div class="field"><label>Wallet / account number</label><input type="text" name="walletNumber" maxlength="40" value="${esc(sh.walletNumber || '')}" placeholder="e.g. 98XXXXXXXX"></div>
@@ -333,66 +335,33 @@ async function shopPage() {
           <div class="photo-btns">
             <label class="btn ghost sm" style="margin:0;color:var(--ink);font-weight:600">${ic('camera', 15)}Upload QR image<input type="file" name="qrfile" accept="image/*" hidden></label>
             <button type="button" class="btn danger sm" id="qrremove" ${qrData ? '' : 'hidden'}>Remove QR</button>
-            <div class="small muted">A screenshot of your eSewa / Khalti / bank QR works.</div>
           </div>
         </div></div>
-      <h3 style="margin-top:22px">Order alerts on your phone</h3>
-      <p class="small muted" style="margin:-6px 0 12px">Every online order arrives here in the admin panel. You can also get each order on your phone the moment it's placed. Use one or more of these (all free):</p>
-
-      <div class="alertbox">
-        <b>${ic('bell', 16)} ntfy app (recommended, easiest)</b>
-        <ol class="small" style="margin:8px 0 10px;padding-left:20px;line-height:1.7">
-          <li>Install the free <b>ntfy</b> app on your phone (Play Store or App Store).</li>
-          <li>In the app tap <b>+</b> and subscribe to this code: <b class="code" id="ntfyShow">${esc(sh.ntfyTopic || '')}</b></li>
-          <li>Save here, then tap <b>Send test</b>.</li>
-        </ol>
-        <div class="row2">
-          <div class="field"><label>ntfy code</label><input type="text" name="ntfyTopic" maxlength="64" value="${esc(sh.ntfyTopic || '')}" placeholder="click New code" autocomplete="off"></div>
-          <div class="field" style="display:flex;gap:8px;align-items:flex-end"><button type="button" class="btn ghost sm" id="ntfyNew">New code</button><button type="button" class="btn ghost sm" id="ntfyTest">${ic('bell', 14)}Send test</button></div>
-        </div>
-        <div class="small muted">For privacy the ntfy alert shows the order number, total and area, not the customer's name or phone. Tap the alert to open this admin panel. Keep the code to yourself.</div>
-      </div>
-
-      <div class="alertbox">
-        <b>${ic('message', 16)} Telegram (full order details)</b>
-        <ol class="small" style="margin:8px 0 10px;padding-left:20px;line-height:1.7">
-          <li>In Telegram, open <b>@BotFather</b>, send <b>/newbot</b> and follow the steps. It gives you a <b>token</b>. Paste it below.</li>
-          <li>Open your new bot and send it any message (or add the bot to your staff group and send a message there).</li>
-          <li>Tap <b>Find my chat</b>, then <b>Send test</b>.</li>
-        </ol>
-        <div class="row2">
-          <div class="field"><label>Bot token</label><input type="text" name="tgToken" maxlength="80" value="${esc(sh.tgToken || '')}" placeholder="123456789:AA..." autocomplete="off"></div>
-          <div class="field"><label>Chat ID</label><input type="text" name="tgChat" maxlength="30" value="${esc(sh.tgChat || '')}" placeholder="filled by Find my chat" autocomplete="off"></div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn ghost sm" id="tgFind">Find my chat</button><button type="button" class="btn ghost sm" id="tgTest">${ic('message', 14)}Send test</button></div>
-        <div class="small muted" style="margin-top:8px">Use this bot only for order alerts. If it ever sends messages you didn't expect, send <b>/revoke</b> to @BotFather and paste the new token here.</div>
-      </div>
-
-      <div class="alertbox">
-      <b>${ic('message', 16)} WhatsApp (CallMeBot, sometimes full)</b>
-      <p class="small muted" style="margin:6px 0 10px">Uses the free CallMeBot service. Set it up once:</p>
-      <ol class="small" style="margin:0 0 14px;padding-left:20px;line-height:1.7">
-        <li>Open <b>callmebot.com</b> → "Free API WhatsApp" and save the bot's phone number shown there in your phone's contacts.</li>
-        <li>From the WhatsApp number below, send the bot: <b>I allow callmebot to send me messages</b></li>
-        <li>The bot replies with your <b>API key</b>. Paste it here, save, then tap <b>Send test message</b>.</li>
-      </ol>
+      <h3 style="margin-top:22px">Order alerts</h3>
       <div class="row2">
-        <div class="field"><label>Your WhatsApp number</label><input type="text" name="whatsapp" maxlength="20" value="${esc(sh.whatsapp || '')}" placeholder="e.g. 9779812345678"><div class="small muted" style="margin-top:4px">With country code (Nepal: 977…)</div></div>
-        <div class="field"><label>CallMeBot API key</label><input type="text" name="alertKey" maxlength="40" value="${esc(sh.alertKey || '')}" placeholder="e.g. 1234567" autocomplete="off"></div>
+        <div class="field"><label>Telegram bot token</label><input type="text" name="tgToken" maxlength="80" value="${esc(sh.tgToken || '')}" autocomplete="off"></div>
+        <div class="field"><label>Telegram chat ID</label><input type="text" name="tgChat" maxlength="30" value="${esc(sh.tgChat || '')}" autocomplete="off"></div>
       </div>
-      <button type="button" class="btn ghost sm" id="watest" style="margin:-4px 0 6px">${ic('message', 14)}Send test message</button>
-      <div class="small muted" style="margin-bottom:6px">If the bot doesn't reply or says it's full, try again in a day or two, or use ntfy / Telegram above.</div>
+      <div class="btnrow"><button type="button" class="btn ghost sm" id="tgFind">Find chat ID</button><button type="button" class="btn ghost sm" id="tgTest">Test Telegram</button></div>
+      <div class="row2">
+        <div class="field"><label>ntfy topic</label><input type="text" name="ntfyTopic" maxlength="64" value="${esc(sh.ntfyTopic || '')}" autocomplete="off"></div>
+        <div class="field btnfield"><button type="button" class="btn ghost sm" id="ntfyNew">Generate</button><button type="button" class="btn ghost sm" id="ntfyTest">Test ntfy</button></div>
       </div>
+      <div class="row2">
+        <div class="field"><label>WhatsApp number</label><input type="text" name="whatsapp" maxlength="20" value="${esc(sh.whatsapp || '')}" placeholder="9779812345678"></div>
+        <div class="field"><label>CallMeBot API key</label><input type="text" name="alertKey" maxlength="40" value="${esc(sh.alertKey || '')}" autocomplete="off"></div>
+      </div>
+      <div class="btnrow"><button type="button" class="btn ghost sm" id="watest">Test WhatsApp</button></div>
       <h3 style="margin-top:22px">Contact</h3>
       <div class="row2">
         <div class="field"><label>Phone shown on the website</label><input type="text" name="phone" maxlength="30" value="${esc(sh.phone || '')}" placeholder="e.g. 9812345678"></div>
       </div>
-      <div class="field"><label>Cafe address</label><input type="text" name="address" maxlength="150" value="${esc(sh.address || '')}" placeholder="e.g. Kawasoti, Nawalparasi"><div class="small muted" style="margin-top:4px">Shown on the website and used for the map. Leave empty for "Kawasoti".</div></div>
+      <div class="field"><label>Cafe address</label><input type="text" name="address" maxlength="150" value="${esc(sh.address || '')}" placeholder="e.g. Kawasoti, Nawalparasi"></div>
       <div class="field"><label>Opening hours</label><input type="text" name="hours" maxlength="80" value="${esc(sh.hours || '')}" placeholder="e.g. Open daily 8am to 9pm"></div>
       <h3 style="margin-top:22px">Website text</h3>
-      <div class="field"><label>Big headline</label><input type="text" name="headline" maxlength="90" value="${esc(sh.headline || '')}" placeholder="Hot momo and fresh chiya, brought to your door."></div>
-      <div class="field"><label>Short intro</label><textarea name="about" rows="2" maxlength="300" placeholder="One or two sentences about your cafe">${esc(sh.about || '')}</textarea></div>
-      <div class="field"><label>Our story (About section)</label><textarea name="story" rows="5" maxlength="800" placeholder="A few sentences about your cafe. Leave an empty line between paragraphs.">${esc(sh.story || '')}</textarea><div class="small muted" style="margin-top:4px">Leave empty to use the default text.</div></div>
+      <div class="field"><label>Big headline</label><input type="text" name="headline" maxlength="90" value="${esc(sh.headline || '')}" placeholder=""></div>
+      <div class="field"><label>Short intro</label><textarea name="about" rows="2" maxlength="300" placeholder="">${esc(sh.about || '')}</textarea></div>
+      <div class="field"><label>Our story</label><textarea name="story" rows="5" maxlength="800" placeholder="">${esc(sh.story || '')}</textarea></div>
       <div class="error"></div>
       <button class="btn" type="submit">Save online shop</button>
     </form>`;
@@ -407,13 +376,11 @@ async function shopPage() {
   $('#qrremove').onclick = () => { qrNew = null; qrRemove = true; $('#qrbox').innerHTML = ic('qr', 40); $('#qrremove').hidden = true; };
   // ---- ntfy ----
   const newTopic = () => 'cloudkitchen-' + Array.from(crypto.getRandomValues(new Uint8Array(8)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
-  f.ntfyTopic.oninput = () => { $('#ntfyShow').textContent = f.ntfyTopic.value.trim(); };
-  $('#ntfyNew').onclick = () => { f.ntfyTopic.value = newTopic(); $('#ntfyShow').textContent = f.ntfyTopic.value; };
-  if (!f.ntfyTopic.value) $('#ntfyNew').click();
+  $('#ntfyNew').onclick = () => { f.ntfyTopic.value = newTopic(); };
   $('#ntfyTest').onclick = () => {
-    const t = f.ntfyTopic.value.trim(); if (!t) return toast('Click New code first', 'alert');
+    const t = f.ntfyTopic.value.trim(); if (!t) return toast('Enter an ntfy topic first', 'alert');
     fetch(`https://ntfy.sh/${encodeURIComponent(t)}?title=${encodeURIComponent(settings.cafeName + ' test')}&tags=bell&priority=high`, { method: 'POST', body: 'Order alerts are working.', mode: 'no-cors' }).catch(() => {});
-    toast('Test sent. It should pop up in the ntfy app within a few seconds (subscribe to the code first).', '', 7000);
+    toast('Test sent');
   };
   // ---- Telegram ----
   $('#tgFind').onclick = async () => {
@@ -422,24 +389,24 @@ async function shopPage() {
       const r = await (await fetch(`https://api.telegram.org/bot${tok}/getUpdates`)).json();
       if (!r.ok) throw new Error(r.description || 'Token not accepted');
       const last = (r.result || []).map(u => (u.message || u.channel_post || u.my_chat_member || {}).chat).filter(Boolean).pop();
-      if (!last) return toast('No messages yet. Send your bot a message in Telegram, then tap Find my chat again.', 'alert', 8000);
-      f.tgChat.value = String(last.id); toast(`Found: ${last.title || last.first_name || last.username || last.id}. Now tap Send test.`);
+      if (!last) return toast('No chat found. Send the bot a message first.', 'alert');
+      f.tgChat.value = String(last.id); toast(`Chat found: ${last.title || last.first_name || last.username || last.id}`);
     } catch (e) {
-      toast('Could not reach Telegram from this browser. Open https://api.telegram.org/bot<token>/getUpdates in a new tab and copy the "chat" "id" number.', 'alert', 10000);
+      toast('Could not reach Telegram', 'alert');
     }
   };
   $('#tgTest').onclick = () => {
     const tok = f.tgToken.value.trim(), chat = f.tgChat.value.trim();
-    if (!tok || !chat) return toast('Fill in the bot token and chat ID first', 'alert');
+    if (!tok || !chat) return toast('Enter the bot token and chat ID first', 'alert');
     fetch(`https://api.telegram.org/bot${tok}/sendMessage?chat_id=${encodeURIComponent(chat)}&text=${encodeURIComponent('Test from ' + settings.cafeName + ': order alerts are working.')}`, { mode: 'no-cors' }).catch(() => {});
-    toast('Test sent. Check Telegram.');
+    toast('Test sent');
   };
   $('#watest').onclick = () => {
     const num = waStart(f.whatsapp.value), key = f.alertKey.value.trim();
-    if (num.length < 10 || !key) return toast('Enter your WhatsApp number (with 977) and the API key first', 'alert');
+    if (num.length < 10 || !key) return toast('Enter the WhatsApp number and API key first', 'alert');
     const text = `Test from ${settings.cafeName}: online order alerts are working.`;
     fetch(`https://api.callmebot.com/whatsapp.php?phone=%2B${num}&apikey=${encodeURIComponent(key)}&text=${encodeURIComponent(text)}`, { mode: 'no-cors' }).catch(() => {});
-    toast('Test sent. Check your WhatsApp in a few seconds. If nothing arrives, check the number and API key.', '', 7000);
+    toast('Test sent');
   };
   f.onsubmit = async e => {
     e.preventDefault();
@@ -458,8 +425,8 @@ async function shopPage() {
     if (row.payOnline && !row.walletNumber && !hasQr) return err.textContent = 'For online payment, add a wallet number or upload a payment QR.';
     if (row.whatsapp && row.whatsapp.length < 10) return err.textContent = 'WhatsApp number looks too short. Include the country code, e.g. 9779812345678.';
     if (row.alertKey && !row.whatsapp) return err.textContent = 'Add your WhatsApp number for the alerts.';
-    if (row.ntfyTopic && !/^[A-Za-z0-9_-]{6,64}$/.test(row.ntfyTopic)) return err.textContent = 'The ntfy code can only use letters, numbers, - and _ (at least 6).';
-    if (row.tgToken && !row.tgChat) return err.textContent = 'Telegram: tap Find my chat to fill in the chat ID (or clear the token).';
+    if (row.ntfyTopic && !/^[A-Za-z0-9_-]{6,64}$/.test(row.ntfyTopic)) return err.textContent = 'ntfy topic: letters, numbers, - and _ only (at least 6).';
+    if (row.tgToken && !row.tgChat) return err.textContent = 'Enter the Telegram chat ID.';
     err.textContent = '';
     const up = { online: { ...row, ...(hasQr ? { payQr: qrNew ? Date.now() : sh.payQr } : {}) } };
     if (qrNew) up.payqr = qrNew;
@@ -501,7 +468,7 @@ function drawDashboard(all) {
   const topList = Object.entries(top).sort((a, b) => b[1] - a[1]);
   const offline = today.filter(o => o.source === 'staff').length;
   const onlineCount = today.filter(o => o.source === 'online').length;
-  const warn = !settings.customerUrl ? `<div class="warn">${ic('alert', 16)} Set your <b>customer menu website address</b> in <b>Settings</b> so the table QR codes work.</div>` : '';
+  const warn = '';
   C().innerHTML = `
     <div class="head"><div><h2>Today</h2><div class="muted">${new Date().toDateString()}</div></div></div>
     ${warn}
@@ -530,7 +497,7 @@ let histDay = null, histSrc = 'all', histQ = '';
 async function historyPage() {
   histDay = histDay || dayKey(Date.now());
   C().innerHTML = `
-    <div class="head"><div><h2>Order history</h2><div class="muted">Every order, by day. Search by name, phone, table or order code.</div></div>
+    <div class="head"><h2>Order history</h2>
       <span class="spacer"></span>
       <button class="btn ghost sm" id="hprev" aria-label="Previous day">&lsaquo;</button>
       <input type="date" id="hday" value="${histDay}" max="${dayKey(Date.now())}" style="max-width:170px">
@@ -585,7 +552,7 @@ async function sales() {
   const now = new Date();
   salesMonth = salesMonth || `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
   C().innerHTML = `
-    <div class="head"><div><h2>Sales report</h2><div class="muted">Sales count orders marked <b>delivered</b>. Times are this device's local time.</div></div>
+    <div class="head"><h2>Sales report</h2>
       <span class="spacer"></span>
       <input type="month" id="mon" value="${salesMonth}" max="${now.getFullYear()}-${pad2(now.getMonth() + 1)}" style="max-width:170px">
       <button class="btn ghost" id="csv">${ic('download', 16)}Download (Excel)</button></div>
@@ -672,7 +639,7 @@ async function menu() {
     .sort((a, b) => String(a.category).localeCompare(b.category) || String(a.name).localeCompare(b.name));
   const cats = [...new Set(items.map(i => i.category))];
   C().innerHTML = `
-    <div class="head"><div><h2>Menu & prices</h2><div class="muted">Changes show on customers' phones right away.</div></div>
+    <div class="head"><h2>Menu & prices</h2>
       <span class="spacer"></span>
       <input type="search" id="msearch" placeholder="Search food…" style="max-width:220px" autocomplete="off">
       <button class="btn" id="add">+ Add food item</button></div>
@@ -727,7 +694,6 @@ function itemForm(it, cats) {
           <div class="photo-btns">
             <label class="btn ghost sm" style="margin:0;color:var(--ink);font-weight:600">${ic('camera', 15)}Choose photo<input type="file" name="file" accept="image/*" hidden></label>
             <button type="button" class="btn danger sm" id="premove" ${it && (it.photo || it.image) ? '' : 'hidden'}>Remove photo</button>
-            <div class="small muted">Square photos look best. It's made smaller automatically.</div>
           </div>
         </div></div>
       <div class="error"></div>
@@ -787,7 +753,7 @@ async function staffPage() {
   const list = listOf((await db.ref('staff').once('value')).val()).map(s => ({ ...s, uid: s.id }))
     .sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
   C().innerHTML = `
-    <div class="head"><div><h2>Waiter accounts</h2><div class="muted">Waiters log in on the waiter panel website with this username and password.</div></div>
+    <div class="head"><h2>Waiter accounts</h2>
       <span class="spacer"></span><button class="btn" id="add">+ Create waiter login</button></div>
     <div class="tablewrap"><table>
       <tr><th>Name</th><th>Username</th><th>Role</th><th>Active</th><th></th></tr>
@@ -872,9 +838,9 @@ async function tables() {
   const list = listOf((await db.ref('tables').once('value')).val()).sort((a, b) => (a.sort || 0) - (b.sort || 0));
   const ok = !!settings.customerUrl;
   C().innerHTML = `
-    <div class="head"><div><h2>Tables & QR codes</h2><div class="muted">Print and stick one QR code on each table.</div></div>
+    <div class="head"><h2>Tables & QR codes</h2>
       <span class="spacer"></span><button class="btn ghost" id="edit">Edit tables</button>${ok ? `<button class="btn" onclick="print()">${ic('printer', 16)}Print all</button>` : ''}</div>
-    ${ok ? '' : `<div class="warn noprint">${ic('alert', 16)} First set your <b>customer menu website address</b> in <b>Settings</b>. The QR codes need it.</div>`}
+    ${ok ? '' : `<div class="warn noprint">${ic('alert', 16)} Set the customer menu website address in Settings first.</div>`}
     <div class="qrgrid">${list.map(t => {
       const url = menuLink(t.id);
       return `<div class="card qrcard">
@@ -927,14 +893,12 @@ async function settingsPage() {
       <div class="field"><label>Cafe name</label><input type="text" name="cafeName" value="${esc(settings.cafeName)}" required maxlength="60"></div>
       <div class="field"><label>Tagline (shown on menu)</label><input type="text" name="tagline" value="${esc(settings.tagline || '')}" maxlength="100"></div>
       <div class="field"><label>Currency symbol</label><input type="text" name="currency" value="${esc(settings.currency)}" maxlength="8" style="max-width:120px"></div>
-      <div class="field"><label>Customer menu website address (used in QR codes)</label>
-        <input type="url" name="customerUrl" value="${esc(settings.customerUrl || '')}" maxlength="300" placeholder="e.g. https://yourname.github.io/ck-menu/">
-        <div class="small muted" style="margin-top:4px">The address where you put the <b>customer</b> site.</div></div>
+      <div class="field"><label>Customer menu website address</label>
+        <input type="url" name="customerUrl" value="${esc(settings.customerUrl || '')}" maxlength="300" placeholder="e.g. https://yourname.github.io/ck-menu/"></div>
       <button class="btn">Save</button>
     </form>
     <form class="card panel" id="s2">
       <h3>Change my password</h3>
-      <div class="small muted" style="margin-bottom:12px">Logged in as <b>${esc(me.username)}</b></div>
       <div class="field"><label>Current password</label><input type="password" name="cur" required autocomplete="current-password"></div>
       <div class="field"><label>New password (min 6 characters)</label><input type="password" name="pw" required minlength="6" autocomplete="new-password"></div>
       <div class="field"><label>Repeat new password</label><input type="password" name="pw2" required minlength="6" autocomplete="new-password"></div>
@@ -969,7 +933,7 @@ async function settingsPage() {
   if (typeof window.CK_FIREBASE === 'undefined') miss.push('config.js');
   if (typeof firebase === 'undefined') miss.push('firebase-app-compat.js');
   if (typeof CONFIGURED === 'undefined') miss.push('common.js');
-  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261030113511') miss.push('common.js (this one is from an older version, upload the new common.js)');
+  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261030120708') miss.push('common.js (this one is from an older version, upload the new common.js)');
   miss = miss.filter(function (v, i, a) { return a.indexOf(v) === i; });
   if (!miss.length) return;
   var s = document.getElementById('splash');
