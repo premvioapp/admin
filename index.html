@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Panel</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .layout{display:flex;min-height:calc(100vh - 56px)}
+  .side{width:220px;flex:none;padding:16px 12px;border-right:1px solid var(--line);background:#fff}
+  .side button{display:block;width:100%;text-align:left;border:0;background:none;padding:11px 14px;border-radius:10px;font-weight:600;margin-bottom:4px}
+  .side button:hover{background:#f6efe8}
+  .side button.on{background:var(--brand-soft);color:var(--brand)}
+  .content{flex:1;padding:24px;max-width:1100px;min-width:0}
+  .content h2{font-size:22px;margin-bottom:4px}
+  .head{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .head .spacer{flex:1}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:22px}
+  .stat{padding:16px}
+  .stat .v{font-size:26px;font-weight:800;margin-top:4px}
+  table{width:100%;border-collapse:collapse;background:#fff}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#fcf9f6}
+  .tablewrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--line);box-shadow:var(--shadow)}
+  td .btn+.btn{margin-left:6px}
+  .thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;background:#f1e9e1;vertical-align:middle}
+  .switch{position:relative;display:inline-block;width:42px;height:24px}
+  .switch input{display:none}
+  .switch span{position:absolute;inset:0;background:#ddd;border-radius:99px;transition:.2s;cursor:pointer}
+  .switch span::after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked+span{background:var(--green)}
+  .switch input:checked+span::after{transform:translateX(18px)}
+  .qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .qrcard{padding:16px;text-align:center}
+  .qrcard img{width:100%;max-width:200px;display:block;margin:6px auto;image-rendering:pixelated}
+  .qrcard .t{font-size:20px;font-weight:800}
+  .qrcard .u{font-size:11px;color:var(--muted);word-break:break-all}
+  .panel{padding:20px;margin-bottom:16px;max-width:560px}
+  .panel h3{font-size:17px;margin-bottom:14px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .catrow td{background:#fcf6f0;font-weight:700;color:var(--brand)}
+  .warn{background:var(--amber-soft);border:1px solid #f1d9a6;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:14px}
+  .linkbtn{background:none;border:0;color:var(--brand);font-weight:600;padding:0;margin-top:14px;display:block;text-align:center;width:100%}
+  @media (max-width:760px){
+    .layout{flex-direction:column}
+    .side{width:auto;display:flex;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
+    .side button{width:auto;white-space:nowrap;margin:0 4px 0 0}
+    .content{padding:16px}
+  }
+  @media print{
+    .topbar,.side,.head,.noprint{display:none!important}
+    body{background:#fff}
+    .content{padding:0;max-width:none}
+    .qrgrid{grid-template-columns:repeat(3,1fr);gap:10mm}
+    .qrcard{break-inside:avoid;box-shadow:none;border:1.5px dashed #999}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="config.js"></script>
+<script src="firebase-app-compat.js"></script>
+<script src="firebase-auth-compat.js"></script>
+<script src="firebase-database-compat.js"></script>
+<script src="qrcode.js"></script>
+<script src="common.js"></script>
+<script>
+let view = 'dashboard', settings = {}, me = null, ordersSub = null;
+const VIEWS = [['dashboard', '📊 Dashboard'], ['menu', '🍜 Menu & prices'], ['staff', '👥 Waiter accounts'], ['tables', '🔳 Tables & QR codes'], ['settings', '⚙️ Settings']];
+
+(async () => {
+  if (!CONFIGURED) return showSetupNeeded($('#app'));
+  try {
+    settings = await loadSettings();
+    const staff = await currentStaff(['admin']);
+    if (staff) return start(staff);
+    const done = (await db.ref('meta/setupDone').once('value')).val();
+    if (!done) return firstTimeSetup();
+    renderLogin($('#app'), { title: settings.cafeName + ' · Admin', roles: ['admin'], onSuccess: start });
+  } catch (e) {
+    $('#app').innerHTML = `<div class="login-wrap"><div class="card login"><h1>Couldn't connect</h1><p class="muted">${esc(friendly(e))}</p>
+      <p class="small muted">Check config.js (especially databaseURL) and that you published database.rules.json in Firebase → Realtime Database → Rules.</p></div></div>`;
+  }
+})();
+
+// Sample data for a brand-new cafe (only added if menu/tables are empty)
+async function seedIfEmpty() {
+  const [m, t, s] = await Promise.all([db.ref('menu').once('value'), db.ref('tables').once('value'), db.ref('settings').once('value')]);
+  const up = {};
+  if (!s.exists()) up.settings = { ...DEFAULT_SETTINGS };
+  if (!t.exists()) for (let i = 1; i <= 10; i++) up['tables/' + i] = { sort: i };
+  if (!m.exists()) [
+    ['Momo', 'Chicken Steam Momo', 180, '10 pcs with tomato achar'], ['Momo', 'Veg Steam Momo', 150, '10 pcs with tomato achar'],
+    ['Momo', 'Buff Jhol Momo', 200, 'Served in spicy sesame soup'], ['Snacks', 'French Fries', 160, 'Crispy salted fries'],
+    ['Snacks', 'Chicken Chowmein', 220, 'Stir-fried noodles'], ['Drinks', 'Milk Tea', 50, ''], ['Drinks', 'Black Coffee', 90, ''],
+    ['Drinks', 'Cold Coffee', 180, 'With ice cream'], ['Drinks', 'Fresh Lime Soda', 120, ''],
+  ].forEach(([category, name, price, description]) => {
+    up['menu/' + db.ref('menu').push().key] = { category, name, price, description, image: '', available: true, createdAt: TS() };
+  });
+  if (Object.keys(up).length) await db.ref().update(up);
+}
+
+// First time only: create the owner's admin account
+function firstTimeSetup() {
+  $('#app').innerHTML = `
+  <div class="login-wrap"><form class="card login" autocomplete="off">
+    <div class="logo">👋</div>
+    <h1>Welcome! Create your admin account</h1>
+    <p class="muted">This is shown only once. The first account made here becomes the owner/admin.</p>
+    <div class="field"><label>Your name</label><input type="text" name="name" required maxlength="60" placeholder="e.g. Kushal"></div>
+    <div class="field"><label>Admin username</label><input type="text" name="username" required autocapitalize="none" placeholder="letters/numbers, e.g. kushal"></div>
+    <div class="field"><label>Password (min 6 characters)</label><input type="password" name="password" required minlength="6" autocomplete="new-password"></div>
+    <div class="error"></div>
+    <button class="btn block">Create admin account</button>
+  </form></div>`;
+  const f = $('form');
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const btn = $('button', f), err = $('.error', f);
+    const username = cleanUsername(f.username.value), name = f.name.value.trim();
+    if (!USERNAME_RE.test(username)) return err.textContent = 'Username: 3–30 letters/numbers (no spaces)';
+    btn.disabled = true; err.textContent = '';
+    try {
+      const email = newStaffEmail(username);
+      const { user } = await auth.createUserWithEmailAndPassword(email, f.password.value);
+      await db.ref().update({
+        ['staff/' + user.uid]: { username, name, role: 'admin', active: true, createdAt: TS() },
+        ['usernames/' + username]: { uid: user.uid, email },
+        'meta/setupDone': true,
+      });
+      await seedIfEmpty();
+      settings = await loadSettings();
+      toast('🎉 Admin account created');
+      start(await currentStaff(['admin']));
+    } catch (ex) { err.textContent = friendly(ex); btn.disabled = false; }
+  };
+}
+
+function start(staff) {
+  me = staff;
+  CURRENCY = settings.currency;
+  $('#app').innerHTML = `
+    <div class="topbar"><span class="name" id="brand">☁️ ${esc(settings.cafeName)} · Admin</span><span class="spacer"></span>
+      <span class="small" style="opacity:.8">👤 ${esc(me.name)}</span>
+      <button class="btn ghost sm" onclick="logout()">Log out</button></div>
+    <div class="layout"><nav class="side" id="side"></nav><div class="content" id="content"></div></div>`;
+  $('#side').onclick = e => { const b = e.target.closest('button'); if (b) { view = b.dataset.v; show(); } };
+  show();
+}
+function show() {
+  if (ordersSub) { ordersSub.off(); ordersSub = null; }
+  $('#side').innerHTML = VIEWS.map(([k, l]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('');
+  ({ dashboard, menu, staff: staffPage, tables, settings: settingsPage }[view])().catch(err => toast(friendly(err), 'alert'));
+}
+const C = () => $('#content');
+
+// ---------- Dashboard (live) ----------
+async function dashboard() {
+  C().innerHTML = `<div class="muted">Loading…</div>`;
+  ordersSub = db.ref('orders').orderByChild('createdAt').limitToLast(500);
+  ordersSub.on('value', snap => {
+    if (view !== 'dashboard') return;
+    const all = [];
+    snap.forEach(c => { const v = c.val(); if (validOrder(v)) all.push(normOrder({ id: c.key, ...v })); });
+    all.reverse();
+    drawDashboard(all);
+  }, e => toast(friendly(e), 'alert'));
+}
+function drawDashboard(all) {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const today = all.filter(o => o.createdAt >= start.getTime() && o.status !== 'cancelled');
+  const sales = today.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+  const pending = all.filter(o => o.status === 'new' || o.status === 'processing').length;
+  const top = {};
+  today.forEach(o => o.items.forEach(l => top[l.name] = (top[l.name] || 0) + l.qty));
+  const topList = Object.entries(top).sort((a, b) => b[1] - a[1]);
+  const offline = today.filter(o => o.source === 'staff').length;
+  const warn = !settings.customerUrl ? `<div class="warn">⚠️ Set your <b>customer menu website address</b> in <b>Settings</b> so the table QR codes work.</div>` : '';
+  C().innerHTML = `
+    <div class="head"><div><h2>Today</h2><div class="muted">${new Date().toDateString()}</div></div></div>
+    ${warn}
+    <div class="stats">
+      <div class="card stat"><div class="muted small">Sales (delivered)</div><div class="v">${money(sales)}</div></div>
+      <div class="card stat"><div class="muted small">Orders today</div><div class="v">${today.length}</div><div class="small muted">${today.length - offline} QR · ${offline} offline</div></div>
+      <div class="card stat"><div class="muted small">Pending now</div><div class="v" style="color:var(--brand)">${pending}</div></div>
+      <div class="card stat"><div class="muted small">Top item</div><div class="v" style="font-size:18px">${topList[0] ? esc(topList[0][0]) : '—'}</div></div>
+    </div>
+    <h3 style="margin:0 0 10px">Recent orders</h3>
+    <div class="tablewrap"><table>
+      <tr><th>Order</th><th>Table</th><th>Items</th><th>Total</th><th>Status</th><th>When</th><th>Staff</th></tr>
+      ${all.slice(0, 50).map(o => `<tr>
+        <td>${esc(o.code)}</td><td><b>${esc(place(o.table))}</b><div class="small muted">${o.source === 'staff' ? '✍️ Offline' : '📱 QR'}</div></td>
+        <td class="small">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}${o.note ? `<div class="muted">📝 ${esc(o.note)}</div>` : ''}</td>
+        <td>${money(o.total)}</td><td><span class="pill ${esc(o.status)}">${esc(o.status)}</span></td>
+        <td class="small muted">${timeAgo(o.createdAt)}</td>
+        <td class="small">${o.createdByName ? 'Added by ' + esc(o.createdByName) : ''}${o.handledBy && o.handledBy !== o.createdByName ? (o.createdByName ? '<br>' : '') + esc(o.handledBy) : ''}</td></tr>`).join('')
+        || `<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">No orders yet</td></tr>`}
+    </table></div>`;
+}
+
+// ---------- Menu ----------
+async function menu() {
+  const items = listOf((await db.ref('menu').once('value')).val()).map(i => ({ ...i, price: Number(i.price) || 0 }))
+    .sort((a, b) => String(a.category).localeCompare(b.category) || String(a.name).localeCompare(b.name));
+  const cats = [...new Set(items.map(i => i.category))];
+  C().innerHTML = `
+    <div class="head"><div><h2>Menu & prices</h2><div class="muted">Changes show on customers' phones right away.</div></div>
+      <span class="spacer"></span>
+      <input type="search" id="msearch" placeholder="🔍 Search food…" style="max-width:220px" autocomplete="off">
+      <button class="btn" id="add">+ Add food item</button></div>
+    <div class="tablewrap"><table>
+      <tr><th></th><th>Item</th><th>Price</th><th>Available</th><th></th></tr>
+      ${cats.map(c => `<tr class="catrow" data-cat="${esc(c)}"><td colspan="5">${esc(c)}</td></tr>` + items.filter(i => i.category === c).map(i => `
+        <tr data-id="${esc(i.id)}" data-cat="${esc(c)}" data-s="${esc([i.name, i.category, i.description].join(' '))}">
+          <td style="width:52px">${i.image ? `<img class="thumb" src="${esc(i.image)}" onerror="this.style.visibility='hidden'">` : ''}</td>
+          <td><b>${esc(i.name)}</b>${i.description ? `<div class="small muted">${esc(i.description)}</div>` : ''}</td>
+          <td><b>${money(i.price)}</b></td>
+          <td><label class="switch"><input type="checkbox" data-a="toggle" ${i.available ? 'checked' : ''}><span></span></label></td>
+          <td style="white-space:nowrap;text-align:right"><button class="btn ghost sm" data-a="edit">Edit</button><button class="btn danger sm" data-a="del">Delete</button></td>
+        </tr>`).join('')).join('') || `<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">No items yet. Add your first food item.</td></tr>`}
+    </table></div>`;
+  $('#add').onclick = () => itemForm(null, cats);
+  $('#msearch').oninput = e => {
+    const qv = e.target.value.trim(), vis = new Set();
+    C().querySelectorAll('tr[data-id]').forEach(tr => { const ok = !qv || matches(qv, tr.dataset.s); tr.style.display = ok ? '' : 'none'; if (ok) vis.add(tr.dataset.cat); });
+    C().querySelectorAll('tr.catrow').forEach(tr => tr.style.display = vis.has(tr.dataset.cat) ? '' : 'none');
+  };
+  C().onclick = async e => {
+    const el = e.target.closest('button[data-a]'); if (!el) return;
+    const id = el.closest('[data-id]').dataset.id, it = items.find(i => i.id === id);
+    if (el.dataset.a === 'edit') itemForm(it, cats);
+    if (el.dataset.a === 'del' && confirm(`Delete "${it.name}"?`)) {
+      try { await db.ref('menu/' + id).remove(); toast('Deleted'); menu(); } catch (err) { toast(friendly(err), 'alert'); }
+    }
+  };
+  C().onchange = async e => {
+    if (e.target.dataset.a !== 'toggle') return;
+    try {
+      await db.ref('menu/' + e.target.closest('[data-id]').dataset.id).update({ available: e.target.checked });
+      toast(e.target.checked ? 'Item is now available' : 'Item hidden from menu (sold out)');
+    } catch (err) { toast(friendly(err), 'alert'); e.target.checked = !e.target.checked; }
+  };
+}
+function itemForm(it, cats) {
+  openModal(`
+    <h2>${it ? 'Edit item' : 'Add food item'}</h2>
+    <form>
+      <div class="field"><label>Name *</label><input type="text" name="name" required maxlength="80" value="${esc(it?.name || '')}" placeholder="e.g. Chicken Momo"></div>
+      <div class="row2">
+        <div class="field"><label>Price (${esc(CURRENCY)}) *</label><input type="number" name="price" required min="0" step="any" value="${it ? it.price : ''}"></div>
+        <div class="field"><label>Category *</label><input type="text" name="category" required list="catlist" maxlength="40" value="${esc(it?.category || '')}" placeholder="e.g. Drinks">
+          <datalist id="catlist">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+      </div>
+      <div class="field"><label>Description</label><input type="text" name="description" maxlength="200" value="${esc(it?.description || '')}" placeholder="Short description (optional)"></div>
+      <div class="field"><label>Photo link (optional)</label><input type="url" name="image" maxlength="500" value="${esc(it?.image || '')}" placeholder="https://…/photo.jpg"></div>
+      <div class="error"></div>
+      <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn">${it ? 'Save changes' : 'Add item'}</button></div>
+    </form>`, (m, close) => {
+    const f = $('form', m);
+    $('[data-close]', m).onclick = close;
+    f.name.focus();
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const row = { name: f.name.value.trim(), price: Number(f.price.value) || 0, category: f.category.value.trim() || 'Other', description: f.description.value.trim(), image: f.image.value.trim() };
+      try {
+        if (it) await db.ref('menu/' + it.id).update(row);
+        else await db.ref('menu').push({ ...row, available: true, createdAt: TS() });
+        close(); toast(it ? 'Saved' : 'Item added'); menu();
+      } catch (err) { $('.error', f).textContent = friendly(err); }
+    };
+  });
+}
+
+// ---------- Staff (waiter accounts) ----------
+// A second Firebase connection is used to create logins, so the admin stays logged in
+let signupApp = null;
+async function createLogin(username, password) {
+  signupApp = signupApp || firebase.initializeApp(FB, 'signup');
+  const email = newStaffEmail(username);
+  const { user } = await signupApp.auth().createUserWithEmailAndPassword(email, password);
+  const uid = user.uid;
+  await signupApp.auth().signOut();
+  return { uid, email };
+}
+
+async function staffPage() {
+  const list = listOf((await db.ref('staff').once('value')).val()).map(s => ({ ...s, uid: s.id }))
+    .sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
+  C().innerHTML = `
+    <div class="head"><div><h2>Waiter accounts</h2><div class="muted">Waiters log in on the waiter panel website with this username and password.</div></div>
+      <span class="spacer"></span><button class="btn" id="add">+ Create waiter login</button></div>
+    <div class="tablewrap"><table>
+      <tr><th>Name</th><th>Username</th><th>Role</th><th>Active</th><th></th></tr>
+      ${list.map(w => `<tr data-id="${esc(w.uid)}">
+        <td><b>${esc(w.name)}</b>${w.uid === me.uid ? ' <span class="small muted">(you)</span>' : ''}</td><td>${esc(w.username)}</td>
+        <td><span class="pill ${w.role === 'admin' ? 'new' : 'delivered'}">${esc(w.role)}</span></td>
+        <td>${w.uid === me.uid ? '' : `<label class="switch"><input type="checkbox" data-a="toggle" ${w.active ? 'checked' : ''}><span></span></label>`}</td>
+        <td style="white-space:nowrap;text-align:right">${w.uid === me.uid ? '' : `<button class="btn ghost sm" data-a="pw">Reset password</button><button class="btn danger sm" data-a="del">Delete</button>`}</td>
+      </tr>`).join('')}
+    </table></div>`;
+  $('#add').onclick = () => openModal(`
+    <h2>Create waiter login</h2>
+    <form autocomplete="off">
+      <div class="field"><label>Full name</label><input type="text" name="name" required maxlength="60" placeholder="e.g. Ramesh"></div>
+      <div class="field"><label>Username (ID)</label><input type="text" name="username" required autocapitalize="none" placeholder="e.g. ramesh"></div>
+      <div class="field"><label>Password (min 6 characters)</label><input type="text" name="password" required minlength="6"></div>
+      <div class="field"><label>Role</label><select name="role"><option value="waiter">Waiter</option><option value="admin">Admin (full access)</option></select></div>
+      <div class="error"></div>
+      <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn" type="submit">Create</button></div>
+    </form>`, (m, close) => {
+    const f = $('form', m); $('[data-close]', m).onclick = close; f.name.focus();
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const btn = $('button[type=submit]', f), err = $('.error', f);
+      const username = cleanUsername(f.username.value);
+      if (!USERNAME_RE.test(username)) return err.textContent = 'Username: 3–30 letters/numbers (no spaces)';
+      btn.disabled = true; err.textContent = '';
+      try {
+        if ((await db.ref('usernames/' + username).once('value')).exists()) throw new Error('That username is already taken');
+        const { uid, email } = await createLogin(username, f.password.value);
+        await db.ref().update({
+          ['staff/' + uid]: { username, name: f.name.value.trim(), role: f.role.value, active: true, createdAt: TS() },
+          ['usernames/' + username]: { uid, email },
+        });
+        close(); toast(`✅ Login created: ${username}`); staffPage();
+      } catch (ex) { err.textContent = friendly(ex); btn.disabled = false; }
+    };
+  });
+  C().onclick = async e => {
+    const el = e.target.closest('button[data-a]'); if (!el) return;
+    const w = list.find(x => x.uid === el.closest('[data-id]').dataset.id);
+    try {
+      if (el.dataset.a === 'del' && confirm(`Delete "${w.name}"? Their login will stop working.`)) {
+        await db.ref().update({ ['staff/' + w.uid]: null, ['usernames/' + w.username]: null });
+        toast('Deleted'); staffPage();
+      }
+      if (el.dataset.a === 'pw') {
+        const pw = prompt(`New password for ${w.username} (min 6 characters):`);
+        if (!pw) return;
+        if (pw.length < 6) return toast('Password must be at least 6 characters', 'alert');
+        // Firebase doesn't let a website change someone else's password, so we make a fresh login
+        // with the same username and new password, and retire the old one.
+        const { uid, email } = await createLogin(w.username, pw);
+        await db.ref().update({
+          ['staff/' + uid]: { username: w.username, name: w.name, role: w.role, active: w.active !== false, createdAt: TS() },
+          ['staff/' + w.uid]: null,
+          ['usernames/' + w.username]: { uid, email },
+        });
+        toast('Password changed'); staffPage();
+      }
+    } catch (err) { toast(friendly(err), 'alert'); }
+  };
+  C().onchange = async e => {
+    if (e.target.dataset.a !== 'toggle') return;
+    try {
+      await db.ref('staff/' + e.target.closest('[data-id]').dataset.id).update({ active: e.target.checked });
+      toast(e.target.checked ? 'Account enabled' : 'Account disabled: they can no longer see orders');
+    } catch (err) { toast(friendly(err), 'alert'); e.target.checked = !e.target.checked; }
+  };
+}
+
+// ---------- Tables & QR ----------
+function menuLink(t) {
+  const base = (settings.customerUrl || '').trim();
+  if (!base) return '';
+  const sep = /\.html?$/i.test(base) || base.endsWith('/') ? '' : '/';
+  return `${base}${sep}?table=${encodeURIComponent(t)}`;
+}
+function qrDataUrl(text) { const qr = qrcode(0, 'M'); qr.addData(text); qr.make(); return qr.createDataURL(8, 2); }
+
+async function tables() {
+  const list = listOf((await db.ref('tables').once('value')).val()).sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  const ok = !!settings.customerUrl;
+  C().innerHTML = `
+    <div class="head"><div><h2>Tables & QR codes</h2><div class="muted">Print and stick one QR code on each table.</div></div>
+      <span class="spacer"></span><button class="btn ghost" id="edit">Edit tables</button>${ok ? `<button class="btn" onclick="print()">🖨️ Print all</button>` : ''}</div>
+    ${ok ? '' : `<div class="warn noprint">⚠️ First set your <b>customer menu website address</b> in <b>Settings</b>. The QR codes need it.</div>`}
+    <div class="qrgrid">${list.map(t => {
+      const url = menuLink(t.id);
+      return `<div class="card qrcard">
+        <div class="small muted">${esc(settings.cafeName)}</div>
+        <div class="t">${esc(place(t.id))}</div>
+        ${url ? `<img src="${qrDataUrl(url)}" alt="QR for ${esc(t.id)}">
+        <div class="small"><b>Scan to see the menu & order</b></div>
+        <div class="u noprint">${esc(url)}</div>
+        <div class="noprint" style="margin-top:8px"><a class="btn ghost sm" style="text-decoration:none" href="${qrDataUrl(url)}" download="qr-${esc(t.id)}.gif">Download</a>
+          <a class="btn ghost sm" style="text-decoration:none" href="${esc(url)}" target="_blank" rel="noopener">Open ↗</a></div>` : `<div class="muted small" style="padding:30px 0">QR appears after you set the website address</div>`}
+      </div>`;
+    }).join('')}</div>`;
+  $('#edit').onclick = () => openModal(`
+    <h2>Edit tables</h2>
+    <form>
+      <div class="field"><label>Quick set: number of tables</label>
+        <div style="display:flex;gap:8px"><input type="number" name="n" min="1" max="200" placeholder="e.g. 12"><button type="button" class="btn ghost" id="fill">Fill 1…N</button></div></div>
+      <div class="field"><label>Table names (one per line: numbers or names like "Rooftop 1")</label>
+        <textarea name="list" rows="10">${esc(list.map(t => t.id).join('\n'))}</textarea></div>
+      <div class="error"></div>
+      <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn" type="submit">Save tables</button></div>
+    </form>`, (m, close) => {
+    const f = $('form', m); $('[data-close]', m).onclick = close;
+    $('#fill', m).onclick = () => { const n = +f.n.value; if (n > 0) f.list.value = Array.from({ length: Math.min(n, 200) }, (_, i) => i + 1).join('\n'); };
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const err = $('.error', f);
+      const names = [...new Set(f.list.value.split('\n').map(s => s.trim()).filter(Boolean))];
+      const bad = names.find(n => n.length > 20 || /[.#$\[\]\/]/.test(n));
+      if (bad) return err.textContent = `"${bad}": max 20 characters, and no . # $ [ ] /`;
+      if (!names.length) return err.textContent = 'Add at least one table';
+      try {
+        const up = {};
+        list.filter(t => !names.includes(t.id)).forEach(t => up['tables/' + t.id] = null);
+        names.forEach((n, i) => up['tables/' + n + '/sort'] = i + 1);
+        await db.ref().update(up);
+        close(); toast('Tables saved'); tables();
+      } catch (ex) { err.textContent = friendly(ex); }
+    };
+  });
+}
+
+// ---------- Settings ----------
+async function settingsPage() {
+  settings = await loadSettings();
+  C().innerHTML = `
+    <div class="head"><h2>Settings</h2></div>
+    <form class="card panel" id="s1">
+      <h3>Cafe details</h3>
+      <div class="field"><label>Cafe name</label><input type="text" name="cafeName" value="${esc(settings.cafeName)}" required maxlength="60"></div>
+      <div class="field"><label>Tagline (shown on menu)</label><input type="text" name="tagline" value="${esc(settings.tagline || '')}" maxlength="100"></div>
+      <div class="field"><label>Currency symbol</label><input type="text" name="currency" value="${esc(settings.currency)}" maxlength="8" style="max-width:120px"></div>
+      <div class="field"><label>Customer menu website address (used in QR codes)</label>
+        <input type="url" name="customerUrl" value="${esc(settings.customerUrl || '')}" maxlength="300" placeholder="e.g. https://yourname.github.io/ck-menu/">
+        <div class="small muted" style="margin-top:4px">The address where you put the <b>customer</b> site.</div></div>
+      <button class="btn">Save</button>
+    </form>
+    <form class="card panel" id="s2">
+      <h3>Change my password</h3>
+      <div class="small muted" style="margin-bottom:12px">Logged in as <b>${esc(me.username)}</b></div>
+      <div class="field"><label>Current password</label><input type="password" name="cur" required autocomplete="current-password"></div>
+      <div class="field"><label>New password (min 6 characters)</label><input type="password" name="pw" required minlength="6" autocomplete="new-password"></div>
+      <div class="field"><label>Repeat new password</label><input type="password" name="pw2" required minlength="6" autocomplete="new-password"></div>
+      <div class="error"></div>
+      <button class="btn">Change password</button>
+    </form>`;
+  $('#s1').onsubmit = async e => {
+    e.preventDefault(); const f = e.target;
+    const row = { cafeName: f.cafeName.value.trim() || 'Cloud Kitchen', tagline: f.tagline.value.trim(), currency: f.currency.value.trim() || 'Rs.', customerUrl: f.customerUrl.value.trim() };
+    try {
+      await db.ref('settings').set(row);
+      Object.assign(settings, row); CURRENCY = settings.currency;
+      $('#brand').textContent = '☁️ ' + settings.cafeName + ' · Admin'; toast('Settings saved');
+    } catch (err) { toast(friendly(err), 'alert'); }
+  };
+  $('#s2').onsubmit = async e => {
+    e.preventDefault(); const f = e.target, err = $('.error', f);
+    if (f.pw.value !== f.pw2.value) return err.textContent = 'New passwords do not match';
+    try {
+      const user = auth.currentUser;
+      await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, f.cur.value));
+      await user.updatePassword(f.pw.value);
+      f.reset(); err.textContent = ''; toast('Password changed');
+    } catch (ex) { err.textContent = /invalid-credential|wrong-password/.test(ex.code || '') ? 'Current password is wrong' : friendly(ex); }
+  };
+}
+</script>
+</body>
+</html>

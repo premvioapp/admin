@@ -1,0 +1,201 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "settings": {
+      ".read": true,
+      ".write": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin')",
+      ".validate": "newData.hasChildren(['cafeName', 'currency'])",
+      "cafeName": {
+        ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+      },
+      "currency": {
+        ".validate": "newData.isString() && newData.val().length <= 8"
+      },
+      "tagline": {
+        ".validate": "newData.isString() && newData.val().length <= 100"
+      },
+      "customerUrl": {
+        ".validate": "newData.isString() && newData.val().length <= 300"
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "meta": {
+      ".read": true,
+      "setupDone": {
+        ".write": "auth != null && !data.exists()",
+        ".validate": "newData.val() == true && newData.parent().parent().child('staff/' + auth.uid + '/role').val() == 'admin'"
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "tables": {
+      ".read": true,
+      ".write": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin')",
+      "$t": {
+        ".validate": "$t.length <= 20 && newData.hasChild('sort')",
+        "sort": {
+          ".validate": "newData.isNumber()"
+        },
+        "lastOrderAt": {
+          ".write": "newData.exists() && data.parent().child('sort').exists()",
+          ".validate": "newData.val() == now && (!data.exists() || now - data.val() >= 10000)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "menu": {
+      ".read": true,
+      ".write": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin')",
+      "$id": {
+        ".validate": "newData.hasChildren(['name', 'price', 'category', 'available'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+        },
+        "price": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "category": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "description": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+        "image": {
+          ".validate": "newData.isString() && newData.val().length <= 500"
+        },
+        "available": {
+          ".validate": "newData.isBoolean()"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "usernames": {
+      "$u": {
+        ".read": true,
+        ".write": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin') || ((auth != null && !root.child('meta/setupDone').exists() && newData.parent().parent().child('meta/setupDone').val() == true) && newData.child('uid').val() == auth.uid)",
+        ".validate": "$u.length >= 3 && $u.length <= 30 && $u.matches(/^[a-z0-9_.-]+$/) && newData.hasChildren(['uid', 'email'])",
+        "uid": {
+          ".validate": "newData.isString()"
+        },
+        "email": {
+          ".validate": "newData.isString()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "staff": {
+      ".read": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin')",
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin') || ((auth != null && !root.child('meta/setupDone').exists() && newData.parent().parent().child('meta/setupDone').val() == true) && auth.uid == $uid)",
+        ".validate": "newData.hasChildren(['username', 'name', 'role', 'active'])",
+        "username": {
+          ".validate": "newData.isString()"
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+        },
+        "role": {
+          ".validate": "newData.val() == 'admin' || newData.val() == 'waiter'"
+        },
+        "active": {
+          ".validate": "newData.isBoolean()"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "orders": {
+      ".read": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true)",
+      ".indexOn": [
+        "createdAt"
+      ],
+      "$id": {
+        ".read": true,
+        ".write": "(!data.exists() && newData.exists()) || (data.exists() && newData.exists() && (auth != null && root.child('staff/' + auth.uid + '/active').val() == true)) || (!newData.exists() && (auth != null && root.child('staff/' + auth.uid + '/active').val() == true && root.child('staff/' + auth.uid + '/role').val() == 'admin'))",
+        ".validate": "newData.hasChildren(['table', 'items', 'status', 'source', 'createdAt', 'updatedAt'])",
+        "table": {
+          ".validate": "newData.isString() && ((data.exists() && newData.val() == data.val()) || (!data.exists() && ((newData.parent().child('source').val() == 'qr' && root.child('tables/' + newData.val() + '/sort').exists() && newData.parent().parent().parent().child('tables/' + newData.val() + '/lastOrderAt').val() == now) || (newData.parent().child('source').val() == 'staff' && (root.child('tables/' + newData.val() + '/sort').exists() || newData.val() == 'Takeaway' || newData.val() == 'Counter')))))"
+        },
+        "source": {
+          ".validate": "(data.exists() && newData.val() == data.val()) || (!data.exists() && (newData.val() == 'qr' || (newData.val() == 'staff' && (auth != null && root.child('staff/' + auth.uid + '/active').val() == true))))"
+        },
+        "status": {
+          ".validate": "newData.val() == 'new' || ((auth != null && root.child('staff/' + auth.uid + '/active').val() == true) && (newData.val() == 'processing' || newData.val() == 'delivered' || newData.val() == 'cancelled'))"
+        },
+        "items": {
+          ".validate": "newData.hasChildren() && (!data.exists() || (auth != null && root.child('staff/' + auth.uid + '/active').val() == true))",
+          "$i": {
+            ".validate": "$i.length <= 2 && $i.matches(/^[0-9]+$/) && newData.hasChildren(['id', 'name', 'price', 'qty'])",
+            "id": {
+              ".validate": "newData.isString() && root.child('menu/' + newData.val() + '/price').exists() && (root.child('menu/' + newData.val() + '/available').val() == true || (auth != null && root.child('staff/' + auth.uid + '/active').val() == true))"
+            },
+            "name": {
+              ".validate": "newData.val() == root.child('menu/' + newData.parent().child('id').val() + '/name').val()"
+            },
+            "price": {
+              ".validate": "newData.val() == root.child('menu/' + newData.parent().child('id').val() + '/price').val()"
+            },
+            "qty": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "note": {
+          ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "createdAt": {
+          ".validate": "(data.exists() && newData.val() == data.val()) || (!data.exists() && newData.val() == now)"
+        },
+        "updatedAt": {
+          ".validate": "newData.val() == now"
+        },
+        "createdBy": {
+          ".validate": "(data.exists() && newData.val() == data.val()) || (!data.exists() && ((newData.parent().child('source').val() == 'qr' && newData.val() == '') || (newData.parent().child('source').val() == 'staff' && newData.val() == auth.uid)))"
+        },
+        "createdByName": {
+          ".validate": "(data.exists() && newData.val() == data.val()) || (!data.exists() && newData.isString() && newData.val().length <= 60 && (newData.val() == '' || (auth != null && root.child('staff/' + auth.uid + '/active').val() == true)))"
+        },
+        "handledBy": {
+          ".validate": "newData.isString() && newData.val().length <= 60 && (newData.val() == '' || (auth != null && root.child('staff/' + auth.uid + '/active').val() == true))"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "calls": {
+      ".read": "(auth != null && root.child('staff/' + auth.uid + '/active').val() == true)",
+      "$t": {
+        ".write": "(newData.exists() && root.child('tables/' + $t + '/sort').exists() && (!data.exists() || now - data.child('at').val() >= 30000)) || (!newData.exists() && (auth != null && root.child('staff/' + auth.uid + '/active').val() == true))",
+        ".validate": "newData.hasChildren(['at'])",
+        "at": {
+          ".validate": "newData.val() == now"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}
