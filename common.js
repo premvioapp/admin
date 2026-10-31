@@ -1,4 +1,4 @@
-window.CK_VERSION = '20261031071527';
+window.CK_VERSION = '20261031074048';
 // Shared helpers for all Cloud Kitchen sites (Firebase Realtime Database version)
 const FB = window.CK_FIREBASE || {};
 const CONFIGURED = !!(FB.apiKey && FB.databaseURL && !/PASTE-/.test(FB.apiKey + FB.appId));
@@ -231,7 +231,9 @@ async function askNotify() {
 }
 async function notify(title, body, tag) {
   if (!notifyOn()) return;
-  const opts = { body: body || '', tag: tag || title, renotify: true, icon: 'icon-192.png', badge: 'icon-192.png', vibrate: [250, 120, 250, 120, 250], requireInteraction: true };
+  // each site gets its own tag: admin and waiter live on the same github.io address, and the same tag
+  // from the same address replaces the other site's pop-up on the phone
+  const opts = { body: body || '', tag: (window.CK_SITE || 'ck') + '-' + (tag || title), renotify: true, icon: 'icon-192.png', badge: 'icon-192.png', vibrate: [250, 120, 250, 120, 250], requireInteraction: true };
   try {
     const r = swReg || (navigator.serviceWorker && await navigator.serviceWorker.getRegistration());
     if (r) { await r.showNotification(title, opts); return; }

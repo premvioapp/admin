@@ -240,7 +240,7 @@ function listenOnline() {
     snap.forEach(c => { const v = c.val(); if (validOrder(v) && v.source === 'online') list.push(normOrder({ id: c.key, ...v })); });
     if (onlineSeen) for (const o of list) if (!onlineSeen.has(o.id) && o.status === 'new') {
       ding(); toast(`New online order from ${o.customer?.name || 'a customer'}: ${money(o.total)}`, 'alert', 8000);
-      if (document.hidden) notify('New online order', `${o.customer?.name || ''}: ${money(o.total)}`, o.id);
+      notify('New online order', `${o.customer?.name || ''}: ${money(o.total)}`, o.id);
     }
     onlineSeen = new Set(list.map(o => o.id));
     onlineOrders = list.sort((a, b) => b.createdAt - a.createdAt);
@@ -981,7 +981,7 @@ async function settingsPage() {
   if (typeof window.CK_FIREBASE === 'undefined') miss.push('config.js');
   if (typeof firebase === 'undefined') miss.push('firebase-app-compat.js');
   if (typeof CONFIGURED === 'undefined') miss.push('common.js');
-  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031071527') miss.push('common.js (this one is from an older version, upload the new common.js)');
+  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031074048') miss.push('common.js (this one is from an older version, upload the new common.js)');
   miss = miss.filter(function (v, i, a) { return a.indexOf(v) === i; });
   if (!miss.length) return;
   var s = document.getElementById('splash');
