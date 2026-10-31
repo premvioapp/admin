@@ -329,8 +329,9 @@ async function shopPage() {
       <h3>Ordering</h3>
       ${tog('enabled', 'Accept online orders', sh.enabled)}
       ${tog('allowDelivery', 'Delivery', sh.allowDelivery !== false)}
-      <div class="field" style="max-width:220px;margin-left:2px"><label>Delivery fee (${esc(CURRENCY)})</label><input type="number" name="deliveryFee" min="0" step="any" value="${Number(sh.deliveryFee) || 0}"></div>
-      <div class="field" style="margin-left:2px"><label>Delivery areas</label><input type="text" name="areas" maxlength="300" value="${esc(sh.areas || 'Falful Chok, Daldaley, Danda')}" placeholder="e.g. Falful Chok, Daldaley, Danda"></div>
+      <div class="field" style="margin-left:2px"><label>Delivery areas and charges (${esc(CURRENCY)})</label>
+        <div id="areas"></div>
+        <button type="button" class="btn ghost sm" id="addarea">+ Add area</button></div>
       ${tog('allowPickup', 'Pickup at the cafe', sh.allowPickup !== false)}
       <h3 style="margin-top:22px">Payment</h3>
       ${tog('cod', 'Cash on delivery / pay at pickup', sh.cod !== false)}
@@ -378,6 +379,16 @@ async function shopPage() {
       <button class="btn" type="submit">Save online shop</button>
     </form>`;
   const f = $('#shopf');
+  // delivery areas, each with its own charge
+  const areaRow = (name = '', fee = '') => `<div class="arearow" style="display:flex;gap:8px;margin-bottom:8px">
+    <input type="text" data-af="name" maxlength="60" placeholder="e.g. Falful Chok" value="${esc(name)}" style="flex:1.6">
+    <input type="number" data-af="fee" min="0" step="any" placeholder="${esc(CURRENCY)}" value="${esc(String(fee))}" style="flex:1">
+    <button type="button" class="btn danger sm" data-af="del" aria-label="Remove area" style="margin:0">${ic('x', 14)}</button></div>`;
+  const names0 = String(sh.areas ?? 'Falful Chok, Daldaley, Danda').split(',').map(a => a.trim()).filter(Boolean);
+  const fees0 = sh.areaFees || {};
+  $('#areas').innerHTML = names0.map(a => areaRow(a, a in fees0 ? fees0[a] : (Number(sh.deliveryFee) || 0))).join('');
+  $('#addarea').onclick = () => { $('#areas').insertAdjacentHTML('beforeend', areaRow()); $('#areas').lastElementChild.querySelector('input').focus(); };
+  $('#areas').onclick = e => { const b = e.target.closest('[data-af=del]'); if (b) b.closest('.arearow').remove(); };
   let qrNew = null, qrRemove = false;
   f.qrfile.onchange = async () => {
     const file = f.qrfile.files[0]; if (!file) return;
@@ -423,13 +434,19 @@ async function shopPage() {
     e.preventDefault();
     const err = $('.error', f), v = n => f[n].value.trim(), on = n => f[n].checked;
     const row = {
-      enabled: on('enabled'), allowDelivery: on('allowDelivery'), allowPickup: on('allowPickup'), deliveryFee: Math.max(0, Number(f.deliveryFee.value) || 0),
+      enabled: on('enabled'), allowDelivery: on('allowDelivery'), allowPickup: on('allowPickup'), deliveryFee: 0,
       cod: on('cod'), advancePct: Math.min(100, Math.max(0, Math.round(Number(f.advancePct.value) || 0))), payOnline: on('payOnline'), walletName: v('walletName'), walletNumber: v('walletNumber'), accountName: v('accountName'),
-      areas: v('areas').split(',').map(a => a.trim()).filter(Boolean).join(', '),
+      areas: '',
       whatsapp: waStart(v('whatsapp')), alertKey: v('alertKey'),
       ntfyTopic: v('ntfyTopic'), tgToken: v('tgToken'), tgChat: v('tgChat'), adminUrl: location.origin + location.pathname, phone: v('phone'), address: v('address'), hours: v('hours'), headline: v('headline'), about: v('about'), story: f.story.value.trim(),
     };
     const hasQr = qrNew || (sh.payQr && !qrRemove);
+    const arows = [...$('#areas').children].map(r => ({ name: r.querySelector('[data-af=name]').value.trim().replace(/\s+/g, ' '), fee: r.querySelector('[data-af=fee]').value.trim() }));
+    if (arows.some(a => !a.name || a.fee === '' || !(Number(a.fee) >= 0))) return err.textContent = 'Fill in the name and charge of every delivery area';
+    if (arows.some(a => /[.#$\[\]\/,]/.test(a.name))) return err.textContent = 'Area names cannot contain . , # $ [ ] /';
+    if (new Set(arows.map(a => a.name.toLowerCase())).size < arows.length) return err.textContent = 'Two delivery areas have the same name';
+    row.areas = arows.map(a => a.name).join(', ');
+    if (arows.length) { row.areaFees = Object.fromEntries(arows.map(a => [a.name, Number(a.fee)])); row.deliveryFee = Math.min(...arows.map(a => Number(a.fee))); }
     if (row.enabled && !row.allowDelivery && !row.allowPickup) return err.textContent = 'Turn on Delivery or Pickup (or both).';
     if (row.enabled && !row.cod && !row.payOnline) return err.textContent = 'Turn on at least one payment option.';
     if (row.allowDelivery && !row.areas) return err.textContent = 'Add at least one delivery area.';
@@ -988,7 +1005,7 @@ async function settingsPage() {
   if (typeof window.CK_FIREBASE === 'undefined') miss.push('config.js');
   if (typeof firebase === 'undefined') miss.push('firebase-app-compat.js');
   if (typeof CONFIGURED === 'undefined') miss.push('common.js');
-  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031091652') miss.push('common.js (this one is from an older version, upload the new common.js)');
+  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031095544') miss.push('common.js (this one is from an older version, upload the new common.js)');
   miss = miss.filter(function (v, i, a) { return a.indexOf(v) === i; });
   if (!miss.length) return;
   var s = document.getElementById('splash');
