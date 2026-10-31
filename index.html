@@ -264,7 +264,7 @@ function drawOnline() {
         <div class="ohead"><div><b class="oname">${esc(c.name || 'Customer')}</b><div class="small muted">Order ${esc(o.code)}, ${timeAgo(o.createdAt)}</div></div><span class="pill ${pill(o)}">${esc(stLabel(o))}</span></div>
         <div class="otype">${o.orderType === 'pickup' ? `${ic('store', 16)} Pickup at the cafe${c.address ? `<div class="small muted" style="font-weight:400">Address: ${esc(c.address)}</div>` : ''}` : `${ic('truck', 16)} Delivery to <b>${esc(c.area || '')}</b>${c.area ? ': ' : ''}${esc(c.address || '')}`}</div>
         <div class="ocontact"><a class="btn ghost sm" href="tel:${esc(tel)}">${ic('call', 14)}${esc(c.phone || '')}</a><a class="btn ghost sm" href="${esc(wa)}" target="_blank" rel="noopener">${ic('message', 14)}WhatsApp</a></div>
-        <ul>${o.items.map(l => `<li><span><b>${l.qty}x</b> ${esc(l.name)}</span><span class="muted">${money(l.price * l.qty)}</span></li>`).join('')}
+        <ul>${o.items.map(l => `<li><span><b>${l.qty}x</b> ${esc(lineName(l))}</span><span class="muted">${money(l.price * l.qty)}</span></li>`).join('')}
           ${o.orderType === 'delivery' ? `<li><span class="muted">Delivery</span><span class="muted">${o.deliveryFee ? money(o.deliveryFee) : 'Free'}</span></li>` : ''}</ul>
         ${o.note ? `<div class="note">${ic('note', 15)} ${esc(o.note)}</div>` : ''}
         <div class="ototal"><span>Total</span><span>${money(o.total)}</span></div>
@@ -464,7 +464,7 @@ function drawDashboard(all) {
   const monthOrders = all.filter(o => o.createdAt >= ms && o.status !== 'cancelled').length;
   const pending = all.filter(o => o.status === 'new' || o.status === 'processing').length;
   const top = {};
-  today.forEach(o => o.items.forEach(l => top[l.name] = (top[l.name] || 0) + l.qty));
+  today.forEach(o => o.items.forEach(l => top[lineName(l)] = (top[lineName(l)] || 0) + l.qty));
   const topList = Object.entries(top).sort((a, b) => b[1] - a[1]);
   const offline = today.filter(o => o.source === 'staff').length;
   const onlineCount = today.filter(o => o.source === 'online').length;
@@ -484,7 +484,7 @@ function drawDashboard(all) {
       <tr><th>Order</th><th>Table</th><th>Items</th><th>Total</th><th>Status</th><th>When</th><th>Staff</th></tr>
       ${all.slice(0, 50).map(o => `<tr>
         <td>${esc(o.code)}</td><td><b>${esc(place(o.table))}</b><div class="small muted">${o.source === 'staff' ? ic('pencil', 12) + ' Offline' : o.source === 'online' ? ic('bag', 12) + ' Online' : ic('phone', 12) + ' QR'}</div></td>
-        <td class="small">${o.items.map(l => `${l.qty}× ${esc(l.name)}`).join(', ')}${o.note ? `<div class="muted">${ic('note', 13)} ${esc(o.note)}</div>` : ''}</td>
+        <td class="small">${o.items.map(l => `${l.qty}× ${esc(lineName(l))}`).join(', ')}${o.note ? `<div class="muted">${ic('note', 13)} ${esc(o.note)}</div>` : ''}</td>
         <td>${money(o.total)}</td><td><span class="pill ${esc(o.status)}">${esc(o.status)}</span></td>
         <td class="small muted">${timeAgo(o.createdAt)}</td>
         <td class="small">${o.createdByName ? 'Added by ' + esc(o.createdByName) : ''}${o.handledBy && o.handledBy !== o.createdByName ? (o.createdByName ? '<br>' : '') + esc(o.handledBy) : ''}</td></tr>`).join('')
@@ -524,7 +524,7 @@ function drawHist() {
   const all = historyPage.data || [], q = histQ.trim();
   const digits = q.replace(/[^0-9]/g, '');
   const list = all.filter(o => (histSrc === 'all' || o.source === histSrc) &&
-    (!q || matches(q, o.code, o.table, o.customer?.name || '', o.customer?.area || '', o.createdByName, o.items.map(l => l.name).join(' ')) || (digits.length >= 3 && String(o.customer?.phone || '').replace(/[^0-9]/g, '').includes(digits))));
+    (!q || matches(q, o.code, o.table, o.customer?.name || '', o.customer?.area || '', o.createdByName, o.items.map(l => lineName(l)).join(' ')) || (digits.length >= 3 && String(o.customer?.phone || '').replace(/[^0-9]/g, '').includes(digits))));
   const done = list.filter(o => o.status === 'delivered');
   const fmtT = t => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   $('#hlist').innerHTML = `
@@ -535,7 +535,7 @@ function drawHist() {
         <td class="small">${fmtT(o.createdAt)}</td>
         <td><b>${esc(o.code)}</b><div class="small muted">${o.source === 'online' ? 'Online' : o.source === 'staff' ? 'Offline' : 'QR'}</div></td>
         <td class="small">${o.source === 'online' ? `<b>${esc(o.customer?.name || '')}</b><br>${esc(o.customer?.phone || '')}<br>${o.orderType === 'pickup' ? 'Pickup' : esc([o.customer?.area, o.customer?.address].filter(Boolean).join(', '))}` : `<b>${esc(place(o.table))}</b>${o.createdByName ? `<br>by ${esc(o.createdByName)}` : ''}`}</td>
-        <td class="small">${o.items.map(l => `${l.qty}x ${esc(l.name)}`).join('<br>')}${o.note ? `<div class="muted">${esc(o.note)}</div>` : ''}</td>
+        <td class="small">${o.items.map(l => `${l.qty}x ${esc(lineName(l))}`).join('<br>')}${o.note ? `<div class="muted">${esc(o.note)}</div>` : ''}</td>
         <td><b>${money(o.total)}</b></td>
         <td class="small">${o.payment ? (o.payment.method === 'online' ? `Online${o.payment.ref ? '<br>' + esc(o.payment.ref) : ''}${o.payment.verified ? '<br><b>received</b>' : ''}` : 'Cash') : 'At cafe'}</td>
         <td><span class="pill ${esc(o.status === 'ready' ? 'processing' : o.status)}">${esc(o.status)}</span></td></tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">${all.length ? 'No orders match' : 'No orders on this day'}</td></tr>`}
@@ -589,7 +589,7 @@ async function drawSales() {
 
   // best sellers
   const items = {};
-  done.forEach(o => o.items.forEach(l => { const it = items[l.name] || (items[l.name] = { qty: 0, sales: 0 }); it.qty += l.qty; it.sales += l.qty * l.price; }));
+  done.forEach(o => o.items.forEach(l => { const it = items[lineName(l)] || (items[lineName(l)] = { qty: 0, sales: 0 }); it.qty += l.qty; it.sales += l.qty * l.price; }));
   const topItems = Object.entries(items).sort((a, b) => b[1].sales - a[1].sales).slice(0, 10);
   const fmtDay = k => new Date(k + 'T00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
   const monthName = new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -649,7 +649,7 @@ async function menu() {
         <tr data-id="${esc(i.id)}" data-cat="${esc(c)}" data-s="${esc([i.name, i.category, i.description].join(' '))}">
           <td style="width:52px">${photoImg(i, 'thumb')}</td>
           <td><b>${esc(i.name)}</b>${i.description ? `<div class="small muted">${esc(i.description)}</div>` : ''}</td>
-          <td><b>${money(i.price)}</b></td>
+          <td>${optsOf(i).length ? optsOf(i).map(o => `<div style="white-space:nowrap">${esc(o.label)} <b>${money(o.price)}</b></div>`).join('') : `<b>${money(i.price)}</b>`}</td>
           <td><label class="switch"><input type="checkbox" data-a="toggle" ${i.available ? 'checked' : ''}><span></span></label></td>
           <td style="white-space:nowrap;text-align:right"><button class="btn ghost sm" data-a="edit">Edit</button><button class="btn danger sm" data-a="del">Delete</button></td>
         </tr>`).join('')).join('') || `<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">No items yet. Add your first food item.</td></tr>`}
@@ -683,10 +683,13 @@ function itemForm(it, cats) {
     <form>
       <div class="field"><label>Name *</label><input type="text" name="name" required maxlength="80" value="${esc(it?.name || '')}" placeholder="e.g. Chicken Momo"></div>
       <div class="row2">
-        <div class="field"><label>Price (${esc(CURRENCY)}) *</label><input type="number" name="price" required min="0" step="any" value="${it ? it.price : ''}"></div>
+        <div class="field" id="pricef"><label>Price (${esc(CURRENCY)}) *</label><input type="number" name="price" min="0" step="any" value="${it ? it.price : ''}"></div>
         <div class="field"><label>Category *</label><input type="text" name="category" required list="catlist" maxlength="40" value="${esc(it?.category || '')}" placeholder="e.g. Drinks">
           <datalist id="catlist">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
       </div>
+      <div class="field"><label>Price options</label>
+        <div id="opts"></div>
+        <button type="button" class="btn ghost sm" id="addopt">+ Add option</button></div>
       <div class="field"><label>Description</label><input type="text" name="description" maxlength="200" value="${esc(it?.description || '')}" placeholder="Short description (optional)"></div>
       <div class="field"><label>Photo (optional)</label>
         <div class="photo-pick">
@@ -717,15 +720,35 @@ function itemForm(it, cats) {
       newPhoto = null; removePhoto = true;
       $('#pbox', m).innerHTML = ic('image', 34); $('#premove', m).hidden = true;
     };
+    // price options (e.g. 6 pcs Rs. 420, 10 pcs Rs. 700)
+    const optRow = (label = '', price = '') => `<div class="optrow" style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="text" data-o="label" maxlength="30" placeholder="e.g. 6 pcs" value="${esc(label)}" style="flex:1.4">
+      <input type="number" data-o="price" min="0" step="any" placeholder="${esc(CURRENCY)}" value="${esc(String(price))}" style="flex:1">
+      <button type="button" class="btn danger sm" data-o="del" aria-label="Remove option" style="margin:0">${ic('x', 14)}</button></div>`;
+    const syncPrice = () => { const has = !!$('#opts', m).children.length; $('#pricef', m).hidden = has; f.price.required = !has; };
+    $('#opts', m).innerHTML = optsOf(it).map(o => optRow(o.label, o.price)).join('');
+    $('#addopt', m).onclick = () => {
+      if ($('#opts', m).children.length >= 20) return;
+      $('#opts', m).insertAdjacentHTML('beforeend', optRow());
+      if ($('#opts', m).children.length === 1 && f.price.value) $('#opts [data-o=price]', m).value = f.price.value;
+      syncPrice(); $('#opts', m).lastElementChild.querySelector('input').focus();
+    };
+    $('#opts', m).onclick = e => { const b = e.target.closest('[data-o=del]'); if (b) { b.closest('.optrow').remove(); syncPrice(); } };
+    syncPrice();
     f.name.focus();
     f.onsubmit = async e => {
       e.preventDefault();
+      const err = $('.error', f); err.textContent = '';
+      const opts = [...$('#opts', m).children].map(r => ({ label: r.querySelector('[data-o=label]').value.trim(), price: r.querySelector('[data-o=price]').value.trim() }));
+      if (opts.some(o => !o.label || o.price === '' || !(Number(o.price) >= 0))) return err.textContent = 'Fill in the name and price of every option';
+      if (new Set(opts.map(o => o.label.toLowerCase())).size < opts.length) return err.textContent = 'Two options have the same name';
+      const options = opts.length ? Object.fromEntries(opts.map((o, i) => ['o' + (i + 1), { label: o.label, price: Number(o.price) }])) : null;
       const btn = $('button:not([type])', f); btn.disabled = true;
       const id = it ? it.id : db.ref('menu').push().key;
-      const row = { name: f.name.value.trim(), price: Number(f.price.value) || 0, category: f.category.value.trim() || 'Other', description: f.description.value.trim() };
+      const row = { name: f.name.value.trim(), price: options ? Math.min(...opts.map(o => Number(o.price))) : Number(f.price.value) || 0, category: f.category.value.trim() || 'Other', description: f.description.value.trim(), options };
       const up = {};
       if (it) for (const k in row) up['menu/' + id + '/' + k] = row[k];
-      else up['menu/' + id] = { ...row, image: '', available: true, createdAt: TS() };
+      else { up['menu/' + id] = { ...row, image: '', available: true, createdAt: TS() }; if (!options) delete up['menu/' + id].options; }
       if (newPhoto) { up['photos/' + id] = newPhoto; up['menu/' + id + '/photo'] = Date.now(); if (it) up['menu/' + id + '/image'] = ''; }
       if (removePhoto && it) { up['photos/' + id] = null; up['menu/' + id + '/photo'] = null; up['menu/' + id + '/image'] = ''; }
       if (!it && newPhoto) { up['menu/' + id].photo = up['menu/' + id + '/photo']; delete up['menu/' + id + '/photo']; }
@@ -933,7 +956,7 @@ async function settingsPage() {
   if (typeof window.CK_FIREBASE === 'undefined') miss.push('config.js');
   if (typeof firebase === 'undefined') miss.push('firebase-app-compat.js');
   if (typeof CONFIGURED === 'undefined') miss.push('common.js');
-  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261030120708') miss.push('common.js (this one is from an older version, upload the new common.js)');
+  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031043856') miss.push('common.js (this one is from an older version, upload the new common.js)');
   miss = miss.filter(function (v, i, a) { return a.indexOf(v) === i; });
   if (!miss.length) return;
   var s = document.getElementById('splash');
