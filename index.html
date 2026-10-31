@@ -114,6 +114,9 @@
   @keyframes ckpulse{50%{transform:scale(1.06)}}
   @keyframes ckbar{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
   @media (prefers-reduced-motion:reduce){.splash img,.splash .bar i{animation:none}}
+  .opay .otxt{flex:1 1 100%;line-height:1.5}
+  .opay .otxt .ic{vertical-align:-2px}
+  .opay .orest{margin-top:6px;font-weight:600}
 </style>
 </head>
 <body>
@@ -274,12 +277,14 @@ function drawOnline() {
           ${o.orderType === 'delivery' ? `<li><span class="muted">Delivery</span><span class="muted">${o.deliveryFee ? money(o.deliveryFee) : 'Free'}</span></li>` : ''}</ul>
         ${o.note ? `<div class="note">${ic('note', 15)} ${esc(o.note)}</div>` : ''}
         <div class="ototal"><span>Total</span><span>${money(o.total)}</span></div>
-        <div class="opay ${pay.method === 'online' ? (pay.verified ? 'ok' : 'warn2') : ''}">
-          ${pay.method === 'online'
-            ? `${ic('phone', 15)} Paid online${pay.ref ? `, transaction ID <b>${esc(pay.ref)}</b>` : ''}. ${pay.verified ? '<b>Payment received</b>' : `Check your ${esc((settings._wallet) || 'wallet')} app.`}`
-            : `${ic('cash', 15)} ${o.orderType === 'pickup' ? 'Pay at pickup' : 'Cash on delivery'}`}
-          ${pay.method === 'online' && !pay.verified ? `<button class="btn green sm" data-pay="1">${ic('check', 14)}Payment received</button>` : ''}
-        </div>
+        ${(() => { const pi = payInfo(o); return `<div class="opay ${pi.kind !== 'cash' ? (pi.verified ? 'ok' : 'warn2') : ''}">
+          <div class="otxt">${pi.kind === 'online'
+            ? `${ic('phone', 15)} Paid online${pi.ref ? `, transaction ID <b>${esc(pi.ref)}</b>` : ''}. ${pi.verified ? '<b>Payment received</b>' : `Check your ${esc((settings._wallet) || 'wallet')} app.`}`
+            : pi.kind === 'advance'
+              ? `${ic('phone', 15)} Advance ${pi.pct}%: <b>${money(pi.now)}</b> paid online${pi.ref ? `, transaction ID <b>${esc(pi.ref)}</b>` : ''}. ${pi.verified ? '<b>Advance received</b>' : `Check your ${esc((settings._wallet) || 'wallet')} app.`}<div class="orest">${ic('cash', 15)} Collect <b>${money(pi.rest)}</b> ${esc(pi.restWord)}</div>`
+              : `${ic('cash', 15)} ${o.orderType === 'pickup' ? 'Pay at pickup' : 'Cash on delivery'}`}</div>
+          ${pi.kind !== 'cash' && !pi.verified ? `<button class="btn green sm" data-pay="1">${ic('check', 14)}${pi.kind === 'advance' ? 'Advance received' : 'Payment received'}</button>` : ''}
+        </div>`; })()}
         <div class="oacts">
           ${o.status === 'new' ? `<button class="btn amber" data-s="processing">${ic('flame', 16)}Accept and start preparing</button><button class="btn danger sm" data-s="cancelled">Cancel</button>` : ''}
           ${o.status === 'processing' ? `<button class="btn" data-s="ready">${o.orderType === 'pickup' ? ic('check', 16) + 'Ready for pickup' : ic('truck', 16) + 'Out for delivery'}</button><button class="btn ghost sm" data-s="new">Undo</button>` : ''}
@@ -329,6 +334,7 @@ async function shopPage() {
       ${tog('allowPickup', 'Pickup at the cafe', sh.allowPickup !== false)}
       <h3 style="margin-top:22px">Payment</h3>
       ${tog('cod', 'Cash on delivery / pay at pickup', sh.cod !== false)}
+      <div class="field" style="max-width:220px;margin-left:2px"><label>Advance payment (%)</label><input type="number" name="advancePct" min="0" max="100" step="1" value="${Number(sh.advancePct) || 0}"></div>
       ${tog('payOnline', 'Pay online', !!sh.payOnline)}
       <div class="row2">
         <div class="field"><label>Wallet or bank</label><input type="text" name="walletName" maxlength="40" value="${esc(sh.walletName || '')}" placeholder="e.g. eSewa, Khalti, Fonepay"></div>
@@ -418,7 +424,7 @@ async function shopPage() {
     const err = $('.error', f), v = n => f[n].value.trim(), on = n => f[n].checked;
     const row = {
       enabled: on('enabled'), allowDelivery: on('allowDelivery'), allowPickup: on('allowPickup'), deliveryFee: Math.max(0, Number(f.deliveryFee.value) || 0),
-      cod: on('cod'), payOnline: on('payOnline'), walletName: v('walletName'), walletNumber: v('walletNumber'), accountName: v('accountName'),
+      cod: on('cod'), advancePct: Math.min(100, Math.max(0, Math.round(Number(f.advancePct.value) || 0))), payOnline: on('payOnline'), walletName: v('walletName'), walletNumber: v('walletNumber'), accountName: v('accountName'),
       areas: v('areas').split(',').map(a => a.trim()).filter(Boolean).join(', '),
       whatsapp: waStart(v('whatsapp')), alertKey: v('alertKey'),
       ntfyTopic: v('ntfyTopic'), tgToken: v('tgToken'), tgChat: v('tgChat'), adminUrl: location.origin + location.pathname, phone: v('phone'), address: v('address'), hours: v('hours'), headline: v('headline'), about: v('about'), story: f.story.value.trim(),
@@ -428,6 +434,7 @@ async function shopPage() {
     if (row.enabled && !row.cod && !row.payOnline) return err.textContent = 'Turn on at least one payment option.';
     if (row.allowDelivery && !row.areas) return err.textContent = 'Add at least one delivery area.';
     if (row.payOnline && !row.walletNumber && !hasQr) return err.textContent = 'For online payment, add a wallet number or upload a payment QR.';
+    if (row.cod && row.advancePct && !row.walletNumber && !hasQr) return err.textContent = 'For advance payment, add a wallet number or upload a payment QR.';
     if (row.whatsapp && row.whatsapp.length < 10) return err.textContent = 'WhatsApp number looks too short. Include the country code, e.g. 9779812345678.';
     if (row.alertKey && !row.whatsapp) return err.textContent = 'Add your WhatsApp number for the alerts.';
     if (row.ntfyTopic && !/^[A-Za-z0-9_-]{6,64}$/.test(row.ntfyTopic)) return err.textContent = 'ntfy topic: letters, numbers, - and _ only (at least 6).';
@@ -542,7 +549,7 @@ function drawHist() {
         <td class="small">${o.source === 'online' ? `<b>${esc(o.customer?.name || '')}</b><br>${esc(o.customer?.phone || '')}<br>${o.orderType === 'pickup' ? 'Pickup' : esc([o.customer?.area, o.customer?.address].filter(Boolean).join(', '))}` : `<b>${esc(place(o.table))}</b>${o.createdByName ? `<br>by ${esc(o.createdByName)}` : ''}`}</td>
         <td class="small">${o.items.map(l => `${l.qty}x ${esc(lineName(l))}`).join('<br>')}${o.note ? `<div class="muted">${esc(o.note)}</div>` : ''}</td>
         <td><b>${money(o.total)}</b></td>
-        <td class="small">${o.payment ? (o.payment.method === 'online' ? `Online${o.payment.ref ? '<br>' + esc(o.payment.ref) : ''}${o.payment.verified ? '<br><b>received</b>' : ''}` : 'Cash') : 'At cafe'}</td>
+        <td class="small">${o.payment ? (() => { const pi = payInfo(o); return pi.kind === 'online' ? `Online${pi.ref ? '<br>' + esc(pi.ref) : ''}${pi.verified ? '<br><b>received</b>' : ''}` : pi.kind === 'advance' ? `Advance ${money(pi.now)}${pi.ref ? '<br>' + esc(pi.ref) : ''}${pi.verified ? '<br><b>received</b>' : ''}<br>Cash ${money(pi.rest)}` : 'Cash'; })() : 'At cafe'}</td>
         <td><span class="pill ${esc(o.status === 'ready' ? 'processing' : o.status)}">${esc(o.status)}</span></td></tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">${all.length ? 'No orders match' : 'No orders on this day'}</td></tr>`}
     </table></div>`;
 }
@@ -981,7 +988,7 @@ async function settingsPage() {
   if (typeof window.CK_FIREBASE === 'undefined') miss.push('config.js');
   if (typeof firebase === 'undefined') miss.push('firebase-app-compat.js');
   if (typeof CONFIGURED === 'undefined') miss.push('common.js');
-  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031074048') miss.push('common.js (this one is from an older version, upload the new common.js)');
+  if (typeof CONFIGURED !== 'undefined' && window.CK_VERSION !== '20261031091652') miss.push('common.js (this one is from an older version, upload the new common.js)');
   miss = miss.filter(function (v, i, a) { return a.indexOf(v) === i; });
   if (!miss.length) return;
   var s = document.getElementById('splash');
